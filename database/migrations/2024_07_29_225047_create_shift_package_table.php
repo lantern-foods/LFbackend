@@ -1,0 +1,34 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        if (!Schema::hasTable('shift_packages')) {
+            Schema::create('shift_packages', function (Blueprint $table) {
+                $table->id();
+                $table->string('package_id');
+                $table->string('shift_id');
+                $table->string('quantity');
+
+                $table->string('package_status')->default(0);
+                $table->timestamps();
+            });
+        }
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('shift_packages');
+    }
+};
