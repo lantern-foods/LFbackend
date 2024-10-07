@@ -9,29 +9,21 @@ use Spatie\Permission\Models\Role;
 class UserRoleController extends Controller
 {
     /**
-     * List assignable roles
+     * List all assignable roles
      */
     public function index()
     {
-        $roles=Role::select('id','name')->get();
+        // Retrieve all roles
+        $roles = Role::select('id', 'name')->get();
 
-        if(!$roles->isEmpty()){
-
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => $roles
-            ];
-
-        }else{
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No roles available!',
-            ];
-
-        }
-
-        return response()->json($data);
+        // Check if roles are available
+        return !$roles->isEmpty() ? response()->json([
+            'status' => 'success',
+            'message' => 'Request successful!',
+            'data' => $roles,
+        ]) : response()->json([
+            'status' => 'no_data',
+            'message' => 'No roles available!',
+        ], 404);
     }
 }

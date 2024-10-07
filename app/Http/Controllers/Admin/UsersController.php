@@ -19,27 +19,19 @@ class UsersController extends Controller
      */
     public function index()
     {
-        $users=User::where('is_admin',0)->select('id','name','email','username','is_active')->get();
+        $users = User::where('is_admin', 0)
+                     ->select('id', 'name', 'email', 'username', 'is_active')
+                     ->get();
 
-        if(!$users->isEmpty()){
-           
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => $users
-            ];
-
-        }else{
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records!',
-            ];
-        }
-
-        return response()->json($data);
+        return !$users->isEmpty() ? response()->json([
+            'status' => 'success',
+            'message' => 'Request successful!',
+            'data' => $users,
+        ]) : response()->json([
+            'status' => 'no_data',
+            'message' => 'No records found!',
+        ], 404);
     }
-
 
     /**
      * Store a newly created resource in storage.
@@ -48,96 +40,72 @@ class UsersController extends Controller
     {
         $request->validated();
 
-        $name=$request->input('name');
-        $email=$request->input('email');
-        $username=$request->input('username');
-        $password=$request->input('password');
+        $username = $request->input('username');
+        $email = $request->input('email');
         $role_id = $request->input('role_id');
 
-        if($this->usernameExists($username)){
-
-             $data = [
+        if ($this->usernameExists($username)) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Username is already in use by another user!'
-            ];
-
-            return response()->json($data);
-
-        }elseif(str_contains($username, ' ')) {
-
-                $data = [
-                    'status' => 'error',
-                    'message' => 'Username cannot contain spaces!',
-                ];
-
-                return response()->json($data);
-
-        }elseif($this->emailAddressExists($email)) {
-
-            $data = [
-                'status' => 'error',
-                'message' => 'The email has already been taken!',
-            ];
-
-            return response()->json($data);
-
+                'message' => 'Username is already in use by another user!',
+            ], 400);
         }
 
-        $user=User::create([
-            "name"=>$name,
-            "email"=>$email,
-            "username"=>$username,
-            "password"=>bcrypt($password),
+        if (str_contains($username, ' ')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Username cannot contain spaces!',
+            ], 400);
+        }
+
+        if ($this->emailAddressExists($email)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The email has already been taken!',
+            ], 400);
+        }
+
+        $user = User::create([
+            'name' => $request->input('name'),
+            'email' => $email,
+            'username' => $username,
+            'password' => bcrypt($request->input('password')),
         ]);
 
-        if($user){
-
+        if ($user) {
             $role = Role::findOrFail($role_id);
             $user->assignRole($role->name);
 
-            $data = [
+            return response()->json([
                 'status' => 'success',
-                'message' => 'User created successfully!'
-            ];
-
-        }else{
-
-            $data = [
-                'status' => 'error',
-                'message' => 'An error occurred. User was NOT created. Please try again!'
-            ];
-
+                'message' => 'User created successfully!',
+            ], 201);
         }
 
-        return response()->json($data);
+        return response()->json([
+            'status' => 'error',
+            'message' => 'An error occurred. User was NOT created. Please try again!',
+        ], 500);
     }
-
 
     /**
      * Fetch resource for editing.
      */
     public function edit(string $id)
     {
-        $user=User::where('is_admin',0)->where('id',$id)->select('name','email','username','is_active')->first();
+        $user = User::where('is_admin', 0)
+                    ->where('id', $id)
+                    ->select('name', 'email', 'username', 'is_active')
+                    ->first();
 
-        if(!empty($user)){
-
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data'=>$user
-            ];
-
-        }else{
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'User record not found or access not allowed!'
-            ];
-
-        }
-
-        return response()->json($data);
+        return $user ? response()->json([
+            'status' => 'success',
+            'message' => 'Request successful!',
+            'data' => $user,
+        ]) : response()->json([
+            'status' => 'no_data',
+            'message' => 'User record not found!',
+        ], 404);
     }
 
     /**
@@ -147,74 +115,46 @@ class UsersController extends Controller
     {
         $request->validated();
 
-        $name=$request->input('name');
-        $email=$request->input('email');
-        $username=$request->input('username');
+        $email = $request->input('email');
+        $username = $request->input('username');
         $role_id = $request->input('role_id');
 
-        if($this->emailAddressExists($email) && !$this->emailBelongsToUser($id,$email)){
-
-            $data = [
+        if ($this->emailAddressExists($email) && !$this->emailBelongsToUser($id, $email)) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Email is already in use by another user!'
-            ];
-
-            return response()->json($data);
-
-        }elseif($this->usernameExists($username) && !$this->usernameBelongsToUser($id,$username)){
-
-            $data = [
-                'status' => 'error',
-                'message' => 'Username is already in use by another user!'
-            ];
-
-            return response()->json($data);
+                'message' => 'Email is already in use by another user!',
+            ], 400);
         }
 
-        $user=User::where('is_admin',0)->where('id',$id)->first();
-
-        if(!empty($user)){
-            $user->name=$name;
-            $user->email=$email;
-            $user->username=$username;
-
-            if($user->update()){
-
-                $user_role = $user->roles->first();
-            
-                if(!empty($user_role)){
-                    if($user_role->id != $role_id) {
-                        $user->removeRole($user_role->name);
-
-                        $role = Role::findOrFail($role_id);
-                        $user->assignRole($role->name);
-                    }
-                }else{
-                    $role = Role::findOrFail($role_id);
-                    $user->assignRole($role->name);
-                }
-
-                $data = [
-                    'status' => 'success',
-                    'message' => 'User updated successfully!'
-                ];
-
-            }else{
-
-                $data = [
-                    'status' => 'error',
-                    'message' => 'An error occurred. User was NOT updated. Please try again!'
-                ];
-
-            }
-        }else{
-            $data = [
-                'status' => 'no_data',
-                'message' => 'User record not found or access not allowed!'
-            ];
+        if ($this->usernameExists($username) && !$this->usernameBelongsToUser($id, $username)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Username is already in use by another user!',
+            ], 400);
         }
 
-        return response()->json($data);
+        $user = User::where('is_admin', 0)->where('id', $id)->firstOrFail();
+
+        $user->update([
+            'name' => $request->input('name'),
+            'email' => $email,
+            'username' => $username,
+        ]);
+
+        $currentRole = $user->roles->first();
+        if ($currentRole && $currentRole->id != $role_id) {
+            $user->removeRole($currentRole->name);
+            $newRole = Role::findOrFail($role_id);
+            $user->assignRole($newRole->name);
+        } elseif (!$currentRole) {
+            $newRole = Role::findOrFail($role_id);
+            $user->assignRole($newRole->name);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'User updated successfully!',
+        ]);
     }
 
     /**
@@ -222,33 +162,19 @@ class UsersController extends Controller
      */
     public function destroy(string $id)
     {
-        $user=User::where('is_admin',0)->where('id',$id)->first();
+        $user = User::where('is_admin', 0)->where('id', $id)->first();
 
-        if(!empty($user)){
-
-            if($user->delete()){
-
-                $data = [
-                    'status' => 'success',
-                    'message' => 'User deleted successfully!'
-                ];
-
-            }else{
-
-                $data = [
-                    'status' => 'error',
-                    'message' => 'An error occurred. User was NOT deleted. Please try again!'
-                ];
-
-            }
-        }else{
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'User record not found or access not allowed!'
-            ];
+        if ($user) {
+            $user->delete();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'User deleted successfully!',
+            ]);
         }
 
-        return response()->json($data);
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'User record not found!',
+        ], 404);
     }
 }

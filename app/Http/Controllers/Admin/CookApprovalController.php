@@ -8,111 +8,111 @@ use App\Models\CookApprovalStatus;
 use App\Models\Cook;
 use App\Jobs\cookapproval;
 use App\Models\CookDocument;
+
 class CookApprovalController extends Controller
 {
-
+    /**
+     * Fetch cook details, documents, and approval status
+     */
     public function edit(string $id)
     {
-        $cook = Cook::where('id',$id)->first();
+        $cook = Cook::find($id);
 
-        if (!empty($cook)) {
+        if ($cook) {
             $cook_document = CookDocument::where('cook_id', $id)->first();
-            $approval = CookApprovalStatus::where('cook_id', $id)->first();
-    
-            if (empty($approval)) {
-                // Approval record not found, create a new one
-                $approval = new CookApprovalStatus;
-                $approval->cook_id = $id; // Assuming there's a cook_id field to link to the Cook
-                $approval->kitchen_name_approved = 0;
-                $approval->id_number_approved = 0;
-                $approval->mpesa_number_approved = 0;
-                $approval->health_number_approved = 0;
-                $approval->health_expiry_date_approved = 0;
-                $approval->shrt_desc_approved = 0;
-                $approval->id_front_approved = 0;
-                $approval->id_back_approved = 0;
-                $approval->health_cert_approved = 0;
-                $approval->profile_pic_approved = 0;
-    
-                // Save the new approval record
-                $approval->save();
-            }
-    
+            $approval = CookApprovalStatus::firstOrCreate(
+                ['cook_id' => $id],
+                [
+                    'kitchen_name_approved' => 0,
+                    'id_number_approved' => 0,
+                    'mpesa_number_approved' => 0,
+                    'health_number_approved' => 0,
+                    'health_expiry_date_approved' => 0,
+                    'shrt_desc_approved' => 0,
+                    'id_front_approved' => 0,
+                    'id_back_approved' => 0,
+                    'health_cert_approved' => 0,
+                    'profile_pic_approved' => 0,
+                ]
+            );
+
             $data = [
                 'status' => 'success',
                 'message' => 'Request successful!',
-                'data' => [$cook, $cook_document, $approval]
+                'data' => [
+                    'cook' => $cook,
+                    'cook_document' => $cook_document,
+                    'approval' => $approval,
+                ],
             ];
-    
         } else {
-    
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Cook record not found or access not allowed!'
-            ];
-    
-        }
-        return response()->json($data);
-    }
-    public function updateApprovalStatus(Request $request, string $id)
-    {
-        $cook = Cook::where('id',$id)->first();
-        $approval = CookApprovalStatus::where('cook_id',$id)->first();
-        // Updating individual approval statuses based on request input
-        
-        $approval->kitchen_name_approved = filter_var($request->input('kitchen_name_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->id_number_approved = filter_var($request->input('id_number_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->mpesa_number_approved = filter_var($request->input('mpesa_number_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->health_number_approved = filter_var($request->input('health_number_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->health_expiry_date_approved = filter_var($request->input('health_expiry_date_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->shrt_desc_approved = filter_var($request->input('shrt_desc_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->id_front_approved = filter_var($request->input('id_front_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->id_back_approved = filter_var($request->input('id_back_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->health_cert_approved = filter_var($request->input('health_cert_approved'), FILTER_VALIDATE_BOOLEAN);
-        $approval->profile_pic_approved = filter_var($request->input('profile_pic_approved'), FILTER_VALIDATE_BOOLEAN);
-        
-        // Check if all items are approved
-        $allApproved = [
-            $approval->kitchen_name_approved,
-            $approval->id_number_approved,
-            $approval->mpesa_number_approved,
-            $approval->health_number_approved,
-            $approval->health_expiry_date_approved,
-            $approval->shrt_desc_approved,
-            $approval->id_front_approved,
-            $approval->id_back_approved,
-            $approval->health_cert_approved,
-            $approval->profile_pic_approved,
-        ];
-
-        $approval->approved = !in_array(0, $allApproved, true);
-
-        // Set rejection reason if provided and not all approved
-        if (!$approval->approved) {
-            $approval->rejection_reason = $request->input('rejection_reason', null);
-            dispatch(new cookapproval($cook,$approval));
-        }
-
-        $approval->update();
-
-
-        if ($approval) {
-            
-            $data = [
-                'status' => 'success',
-                'message' => 'Cook approval status updated successful'
-            ];
-        }else {
-            
             $data = [
                 'status' => 'error',
-                'message' => 'An error occurred.Cook approval status was NOT update!'
+                'message' => 'Cook record not found or access not allowed!',
             ];
         }
 
         return response()->json($data);
     }
 
+    /**
+     * Update cook approval status
+     */
+    public function updateApprovalStatus(Request $request, string $id)
+    {
+        // Validate the incoming request
+        $request->validate([
+            'kitchen_name_approved' => 'required|boolean',
+            'id_number_approved' => 'required|boolean',
+            'mpesa_number_approved' => 'required|boolean',
+            'health_number_approved' => 'required|boolean',
+            'health_expiry_date_approved' => 'required|boolean',
+            'shrt_desc_approved' => 'required|boolean',
+            'id_front_approved' => 'required|boolean',
+            'id_back_approved' => 'required|boolean',
+            'health_cert_approved' => 'required|boolean',
+            'profile_pic_approved' => 'required|boolean',
+            'rejection_reason' => 'nullable|string',
+        ]);
 
-    
+        $cook = Cook::findOrFail($id);
+        $approval = CookApprovalStatus::where('cook_id', $id)->firstOrFail();
+
+        // Update individual approval statuses
+        $approval->fill([
+            'kitchen_name_approved' => $request->input('kitchen_name_approved'),
+            'id_number_approved' => $request->input('id_number_approved'),
+            'mpesa_number_approved' => $request->input('mpesa_number_approved'),
+            'health_number_approved' => $request->input('health_number_approved'),
+            'health_expiry_date_approved' => $request->input('health_expiry_date_approved'),
+            'shrt_desc_approved' => $request->input('shrt_desc_approved'),
+            'id_front_approved' => $request->input('id_front_approved'),
+            'id_back_approved' => $request->input('id_back_approved'),
+            'health_cert_approved' => $request->input('health_cert_approved'),
+            'profile_pic_approved' => $request->input('profile_pic_approved'),
+        ]);
+
+        // Check if all items are approved
+        $approval->approved = !in_array(0, $approval->only([
+            'kitchen_name_approved', 'id_number_approved', 'mpesa_number_approved', 'health_number_approved',
+            'health_expiry_date_approved', 'shrt_desc_approved', 'id_front_approved', 'id_back_approved',
+            'health_cert_approved', 'profile_pic_approved'
+        ]), true);
+
+        // Set rejection reason if not all approved
+        if (!$approval->approved) {
+            $approval->rejection_reason = $request->input('rejection_reason', null);
+            // Dispatch job for cook approval notification
+            dispatch(new cookapproval($cook, $approval));
+        }
+
+        $approval->save();
+
+        $data = [
+            'status' => 'success',
+            'message' => 'Cook approval status updated successfully',
+        ];
+
+        return response()->json($data);
+    }
 }

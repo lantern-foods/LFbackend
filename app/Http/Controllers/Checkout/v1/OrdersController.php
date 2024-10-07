@@ -3,106 +3,93 @@
 namespace App\Http\Controllers\Checkout\v1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Cart;
-use App\Models\Customeraddress;
-use App\Traits\Numbers;
-use App\Traits\Orders;
-use App\Traits\Constants;
-
-use Carbon\Carbon;
-
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use PHPUnit\TextUI\Configuration\Constant;
 
 class OrdersController extends Controller
 {
-    use Numbers, Orders;
-
     /**
-     * Create order
+     * Create a booked order
      */
-    // BOOKED ORDER
     public function createOrder(Request $request)
     {
         $this->createBookedOrderAction($request);
     }
+
+    /**
+     * Create an express order
+     */
     public function createExpressOrder(Request $request)
     {
         $this->createExpressOrderAction($request);
     }
 
-
+    /**
+     * Get a specific order by ID for the authenticated user
+     */
     public function get_order(string $id)
     {
         $client_id = Auth::id();
-        $pending_orders = DB::table('orders')
+        $pending_order = DB::table('orders')
             ->where('id', $id)
             ->where('client_id', $client_id)
-            // ->where("status", '=', "Pending Payment")
             ->first();
 
-
-        if (!empty($pending_orders)) {
-            $data = [
+        if ($pending_order) {
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful!',
-                'data' => $pending_orders,
-            ];
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load your order. Please try again!',
-            ];
+                'data' => $pending_order,
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Unable to load your order. Please try again!',
+        ], 404);
     }
 
+    /**
+     * Get all orders for the authenticated user based on type (booked or express)
+     */
     public function get_orders(Request $request)
     {
         $client_id = Auth::id();
-        $type = $request->query('type','booked');
-      if($type =='booked'){
-          $all_orders = DB::table('orders')
-              ->join('order_details', 'order_details.order_id', '=', 'orders.id')
-              ->where('client_id', $client_id)
-//              where order_details.shift_id,'==',null
-                  ->whereNull('order_details.shift_id')
+        $type = $request->query('type', 'booked');
 
+        $all_orders = DB::table('orders')
+            ->join('order_details', 'order_details.order_id', '=', 'orders.id')
+            ->where('client_id', $client_id)
+            ->when($type == 'booked', function ($query) {
+                return $query->whereNull('order_details.shift_id');
+            }, function ($query) {
+                return $query->whereNotNull('order_details.shift_id');
+            })
+            ->orderBy('orders.created_at', 'desc')
+            ->get();
 
-              ->orderBy('orders.created_at', 'desc')
-              ->get();
-      }else{
-          $all_orders = DB::table('orders')
-              ->join('order_details', 'order_details.order_id', '=', 'orders.id')
-              ->where('client_id', $client_id)
-              ->whereNotNull('order_details.shift_id')
-              ->orderBy('orders.created_at', 'desc')
-              ->get();
-      }
-
-        if (!empty($all_orders)) {
-            $data = [
+        if ($all_orders->isNotEmpty()) {
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful!',
                 'data' => $all_orders,
-            ];
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load your order. Please try again!',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Unable to load your orders. Please try again!',
+        ], 404);
     }
 
+    /**
+     * Get detailed order information for a specific client order
+     */
     public function client_order(string $id)
     {
         $client_id = Auth::id();
-        $client_orders = DB::table('orders')
+        $client_order = DB::table('orders')
             ->join('order_details', 'order_details.order_id', '=', 'orders.id')
             ->join('clients', 'orders.client_id', '=', 'clients.id')
             ->join('meals', 'order_details.meal_id', '=', 'meals.id')
@@ -111,19 +98,17 @@ class OrdersController extends Controller
             ->where('orders.client_id', $client_id)
             ->first();
 
-        if (!empty($client_orders)) {
-            $data = [
+        if ($client_order) {
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful!',
-                'data' => $client_orders,
-            ];
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load your order. Please try again!',
-            ];
+                'data' => $client_order,
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Unable to load your order. Please try again!',
+        ], 404);
     }
 }

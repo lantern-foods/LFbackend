@@ -21,18 +21,15 @@ class DeliveryAdminController extends Controller
     {
         $deliverycompanies = Deliverycompany::all();
 
-        if (!$deliverycompanies->isEmpty()) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $deliverycompanies,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
-        }
+        $data = !$deliverycompanies->isEmpty() ? [
+            'status' => 'success',
+            'message' => 'Request successful',
+            'data' => $deliverycompanies,
+        ] : [
+            'status' => 'no_data',
+            'message' => 'No records found',
+        ];
+
         return response()->json($data);
     }
 
@@ -43,88 +40,73 @@ class DeliveryAdminController extends Controller
     {
         $request->validated();
 
-        $full_name = $request->input('full_name');
-        $phone_number = $request->input('phone_number');
-        $email = $request->input('email');
-        $company = $request->input('company');
-        $location_charge = $request->input('location_charge');
-
-        if ($this->emailAddressExists($email)) {
-            $data = [
+        if ($this->emailAddressExists($request->input('email'))) {
+            return response()->json([
                 'status' => 'error',
                 'message' => 'Email address is already in use by another account!',
-            ];
+            ]);
+        }
 
-            return response()->json($data);
-        } elseif ($this->phonenoExists($phone_number)) {
-            $data = [
+        if ($this->phonenoExists($request->input('phone_number'))) {
+            return response()->json([
                 'status' => 'error',
                 'message' => 'Phone number is already in use by another account!',
-            ];
-
-            return response()->json($data);
+            ]);
         }
 
-        $deliverycompany = Deliverycompany::create([
-            'full_name' => $full_name,
-            'phone_number' => $phone_number,
-            'email' => $email,
-            'company' => $company,
-            'location_charge' => $location_charge,
-        ]);
+        $deliverycompany = Deliverycompany::create($request->only([
+            'full_name', 'phone_number', 'email', 'company', 'location_charge'
+        ]));
+
         if ($deliverycompany) {
-            // Dispatch the SendOtpJob to send OTP asynchronously
+            // Dispatch OTP job asynchronously
             $this->sendOtp($deliverycompany);
 
-            $data = [
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Account created successfully. An OTP has be sent to the delivery company phone number.',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'A problem was encountered, account was NOT created. Please try again!',
-            ];
+                'message' => 'Account created successfully. An OTP has been sent to the delivery company\'s phone number.',
+            ]);
         }
-        return response()->json($data);
-    }
 
-    public function sendOtp(Deliverycompany $deliverycompany)
-    {
-        // Generate a random 6-digit OTP
-        $otp = mt_rand(100000, 999999);
-
-        // Save the OTP to the client record in the database
-        $deliverycompany->update(['delvry_otp' => $otp]);
-
-        // dispatch(new SendDeliverycompanyOtp($deliverycompany));
-
-        $data = [
-            'status' => 'success',
-            'message' => 'OTP sent successfully',
-        ];
-        return response()->json($data);
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Account creation failed. Please try again!',
+        ]);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Send OTP to a delivery company
+     */
+    public function sendOtp(Deliverycompany $deliverycompany)
+    {
+        // Generate and save OTP
+        $otp = mt_rand(100000, 999999);
+        $deliverycompany->update(['delvry_otp' => $otp]);
+
+        // Dispatch the job to send OTP asynchronously
+        dispatch(new SendDeliverycompanyOtp($deliverycompany));
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'OTP sent successfully',
+        ]);
+    }
+
+    /**
+     * Edit a delivery company profile
      */
     public function edit(string $id)
     {
-        $deliverycompany = Deliverycompany::where('id', $id)->first();
+        $deliverycompany = Deliverycompany::find($id);
 
-        if (!empty($deliverycompany)) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => $deliverycompany,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'deliverycompany record not found or access not allowed!',
-            ];
-        }
+        return $deliverycompany ? response()->json([
+            'status' => 'success',
+            'message' => 'Request successful!',
+            'data' => $deliverycompany,
+        ]) : response()->json([
+            'status' => 'no_data',
+            'message' => 'Delivery company record not found!',
+        ]);
     }
 
     /**
@@ -133,56 +115,38 @@ class DeliveryAdminController extends Controller
     public function update(UpdateDeliverycompanyRequest $request, string $id)
     {
         $request->validated();
-        $full_name = $request->input('full_name');
-        $phone_number = $request->input('phone_number');
-        $email = $request->input('email');
-        $company = $request->input('company');
-        $location_charge = $request->input('location_charge');
 
-        if ($this->emailAddressExists($email) && !$this->emailBelongsToDeliverycompany($id, $email)) {
-            $data = [
+        if ($this->emailAddressExists($request->input('email')) && !$this->emailBelongsToDeliverycompany($id, $request->input('email'))) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Email is already in use by another delivery company!'
-            ];
-
-            return response()->json($data);
-        } elseif ($this->phonenoExists($phone_number) && !$this->phoneBelongsToDeliverycompany($id, $phone_number)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Phone  number is already in use by another user!'
-            ];
-
-            return response()->json($data);
+                'message' => 'Email is already in use by another delivery company!',
+            ]);
         }
 
-        $deliverycompany = Deliverycompany::where('id', $id)->first();
-
-        if (!empty($deliverycompany)) {
-            $deliverycompany->full_name = $full_name;
-            $deliverycompany->email = $email;
-            $deliverycompany->phone_number = $phone_number;
-            $deliverycompany->company = $company;
-            $deliverycompany->location_charge = $location_charge;
-
-            if ($deliverycompany->update()) {
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Profile updated successfully',
-                ];
-            } else {
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered. Profile was NOT updated. Please try again!',
-                ];
-            }
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to locate your profile for update. Please try again!',
-            ];
+        if ($this->phonenoExists($request->input('phone_number')) && !$this->phoneBelongsToDeliverycompany($id, $request->input('phone_number'))) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Phone number is already in use by another account!',
+            ]);
         }
 
-        return response()->json($data);
+        $deliverycompany = Deliverycompany::find($id);
+
+        if ($deliverycompany) {
+            $deliverycompany->update($request->only([
+                'full_name', 'phone_number', 'email', 'company', 'location_charge'
+            ]));
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Profile updated successfully',
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Delivery company profile not found!',
+        ]);
     }
 
     /**
@@ -190,6 +154,20 @@ class DeliveryAdminController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $deliverycompany = Deliverycompany::find($id);
+
+        if ($deliverycompany) {
+            $deliverycompany->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Delivery company deleted successfully',
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Failed to delete delivery company. It may not exist!',
+        ]);
     }
 }

@@ -6,78 +6,92 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Meal;
 use App\Models\MealImage;
-class mealapprovalController extends Controller
+
+class MealApprovalController extends Controller
 {
- 
- 
-
-
     /**
-     * Show the form for editing the specified resource.
+     * Show the meal and its associated images for approval.
      */
     public function edit(string $id)
     {
-        $meal_aprroval = Meal::where('id',$id)->first();
+        $meal = Meal::find($id);
 
-        if (!empty($meal_aprroval))
-        {
-            $meal_images = MealImage::where('meal_id',$id)->first();
-            $data = [
+        if ($meal) {
+            $mealImages = MealImage::where('meal_id', $id)->get();
+
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful!',
-                'data'=> [$meal_aprroval, $meal_images]
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'User record not found or access not allowed!'
-            ];
-
+                'data' => [
+                    'meal' => $meal,
+                    'meal_images' => $mealImages,
+                ],
+            ]);
         }
 
-        return response()->json($data);
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Meal record not found!',
+        ], 404);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update the meal approval status.
      */
     public function update(Request $request, string $id)
     {
-        $this->validate($request, [
-            'status' => 'required'
-        ],
-        [
-            'status.required' => 'Approval status is required'
+        // Validate request input
+        $request->validate([
+            'status' => 'required|string',
+        ], [
+            'status.required' => 'Approval status is required',
         ]);
 
-        $meal = Meal::findOrFail($id);
-        $meal->status=$request->input('status');
-        $meal->update();
+        try {
+            // Find the meal
+            $meal = Meal::findOrFail($id);
 
+            // Update meal status
+            $meal->update([
+                'status' => $request->input('status'),
+            ]);
 
-        if (!empty($meal)) {
-            
-            $data = [
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Meal approved successfully!',
-                
-            ];
-        } else {
-            $data = [
+                'message' => 'Meal status updated successfully!',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Unable to update role. Please try again!',
-            ];
-
+                'message' => 'Unable to update meal status. Please try again!',
+            ], 500);
         }
-
-        return response()->json($data);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified meal from storage.
      */
     public function destroy(string $id)
     {
-        //
+        try {
+            // Find the meal
+            $meal = Meal::findOrFail($id);
+
+            // Delete the meal images associated with this meal
+            MealImage::where('meal_id', $id)->delete();
+
+            // Delete the meal
+            $meal->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Meal deleted successfully!',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unable to delete meal. Please try again!',
+            ], 500);
+        }
     }
 }

@@ -14,17 +14,11 @@ class ShiftAdminController extends Controller
     public function index()
     {
         $shifts = ShiftAdminControll::all();
-        return response()->json($shifts);
-
-        //
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Request successful!',
+            'data' => $shifts,
+        ]);
     }
 
     /**
@@ -32,45 +26,35 @@ class ShiftAdminController extends Controller
      */
     public function store(Request $request)
     {
-        // if (!auth()->user()->can('create', ShiftAdminControll::class)) {
-        //     return response()->json(['success' => false, 'message' => 'Unauthorized']);
-        // }
-        if ($request->start_time == null || $request->end_time == null) {
-            return response()->json(['success' => false, 'message' => 'Please fill all the fields']);
-        }
-        $all_closed = 0;
-        if ($request->all_shifts_closed == true) {
-            $all_closed = 1;
-        }
-
-        $shiftControl = ShiftAdminControll::create([
-            'shift_start_time' => $request->start_time,
-            'shift_end_time' => $request->end_time,
-            'all_shifts_closed' => $all_closed
+        // Validate the request input
+        $request->validate([
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'all_shifts_closed' => 'required|boolean',
+        ], [
+            'start_time.required' => 'Start time is required.',
+            'end_time.required' => 'End time is required and must be after start time.',
+            'all_shifts_closed.required' => 'Shift closure status is required.',
         ]);
-        if ($shiftControl) {
-            return response()->json(['success' => true, 'message' => 'Shift Time Created Successfully']);
-        } else {
-            return response()->json(['success' => false, 'message' => 'Something went wrong']);
+
+        try {
+            $shiftControl = ShiftAdminControll::create([
+                'shift_start_time' => $request->start_time,
+                'shift_end_time' => $request->end_time,
+                'all_shifts_closed' => $request->all_shifts_closed ? 1 : 0,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Shift time created successfully!',
+                'data' => $shiftControl,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to create shift. Please try again.',
+            ], 500);
         }
-
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
     }
 
     /**
@@ -78,21 +62,33 @@ class ShiftAdminController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $shift = ShiftAdminControll::find($id);
-        if (!$shift) {
-            return response()->json(['success' => false, 'message' => 'Shift not found']);
-        }
-        $all_closed = 0;
-        if ($request->all_shifts_closed == true) {
-            $all_closed = 1;
-        }
+        // Validate the request input
+        $request->validate([
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'all_shifts_closed' => 'required|boolean',
+        ]);
 
-        $shift->shift_start_time = $request->start_time;
-        $shift->shift_end_time = $request->end_time;
-        $shift->all_shifts_closed = $all_closed;
-        $shift->save();
-        return response()->json($shift);
-        //
+        try {
+            $shift = ShiftAdminControll::findOrFail($id);
+
+            $shift->update([
+                'shift_start_time' => $request->start_time,
+                'shift_end_time' => $request->end_time,
+                'all_shifts_closed' => $request->all_shifts_closed ? 1 : 0,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Shift updated successfully!',
+                'data' => $shift,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update shift. Please try again.',
+            ], 500);
+        }
     }
 
     /**
@@ -100,6 +96,19 @@ class ShiftAdminController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        try {
+            $shift = ShiftAdminControll::findOrFail($id);
+            $shift->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Shift deleted successfully!',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete shift. Please try again.',
+            ], 500);
+        }
     }
 }

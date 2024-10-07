@@ -17,86 +17,63 @@ class RolesController extends Controller
      */
     public function index()
     {
-        $roles=Role::select('id','name','created_at','updated_at')
-                        ->where('is_default',0)
-                        ->get();
+        $roles = Role::select('id', 'name', 'created_at', 'updated_at')
+                     ->where('is_default', 0)
+                     ->get();
 
-        if(!$roles->isEmpty()){
-           
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => $roles
-            ];
-
-        }else{
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records!',
-            ];
-        }
-
-        return response()->json($data);
+        return !$roles->isEmpty() ? response()->json([
+            'status' => 'success',
+            'message' => 'Request successful!',
+            'data' => $roles,
+        ]) : response()->json([
+            'status' => 'no_data',
+            'message' => 'No records found!',
+        ]);
     }
-
 
     /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
     {
-        $this->validate($request,[
-            'role_name'=>'required'
-        ],
-        [
-            'role_name.required'=>'Role Name is required!'
+        $request->validate([
+            'role_name' => 'required|string|max:255',
+            'permissions' => 'array',
+        ], [
+            'role_name.required' => 'Role name is required!',
         ]);
 
-        $payload = $request->json()->all();
+        try {
+            $role_name = $request->input('role_name');
+            $permissions = $request->input('permissions', []);
 
-        $role_name = $payload['role_name'];
-        $permissions = $payload['permissions'];
+            if ($this->roleExists($role_name)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Role already exists!',
+                ], 400);
+            }
 
+            $role = Role::create([
+                'name' => $role_name,
+                'guard_name' => 'api',
+            ]);
 
-        if($this->roleExists($role_name)){
+            if (!empty($permissions)) {
+                $role->syncPermissions($permissions);
+            }
 
-            $data = [
-                'status' => 'error',
-                'message' => 'Role already exists!',
-            ];
-
-            return response()->json($data);
-        }
-        
-        $role = Role::create([
-            'name' => $role_name,
-            'guard_name' => 'api',
-        ]);
-        
-        //Assign permissions to the role
-        if(!empty($permissions)) {
-            $role->syncPermissions($permissions);
-        }
-
-        if($role){
-
-            $data = [
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Role created successfully!',
-                'data' => $role
-            ];
-
-        }else{
-
-            $data = [
+                'data' => $role,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
                 'status' => 'error',
                 'message' => 'Unable to create role. Please try again!',
-            ];
-
+            ], 500);
         }
-
-        return response()->json($data);
     }
 
     /**
@@ -104,22 +81,24 @@ class RolesController extends Controller
      */
     public function edit(string $id)
     {
-        $role=Role::select('id','name')->findOrFail($id);
+        try {
+            $role = Role::select('id', 'name')->findOrFail($id);
+            $permissions = DB::table('role_has_permissions')
+                             ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+                             ->where('role_id', $id)
+                             ->pluck('permissions.name');
 
-        $permissions =DB::table('role_has_permissions')->join('permissions','role_has_permissions.permission_id','=','permissions.id')->where('role_id',$id)->get()->toArray();
-            
-        $role_permissions = [];
-        foreach ($permissions as $role_perm) {
-            $role_permissions[] = $role_perm->name;
+            return response()->json([
+                'status' => 'success',
+                'role' => $role,
+                'permissions' => $permissions,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Role not found!',
+            ], 404);
         }
-
-        $data=[
-            'status' => 'success',
-            'role'=>$role,
-            'permissions'=>$role_permissions
-        ];
-
-        return response()->json($data);
     }
 
     /**
@@ -127,45 +106,36 @@ class RolesController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $this->validate($request,[
-            'role_name'=>'required'
-        ],
-        [
-            'role_name.required'=>'Role Name is required!'
+        $request->validate([
+            'role_name' => 'required|string|max:255',
+            'permissions' => 'array',
+        ], [
+            'role_name.required' => 'Role name is required!',
         ]);
 
-        $payload = $request->json()->all();
+        try {
+            $role = Role::findOrFail($id);
 
-        $role_name = $payload['role_name'];
-        $permissions = $payload['permissions'];
-        
-        $role = Role::findOrFail($id);
-        $role->name=$role_name;
-        $role->update();
-        
-        //Assign permissions to the role
-        if(!empty($permissions)) {
-            $role->syncPermissions($permissions);
-        }
+            $role->update([
+                'name' => $request->input('role_name'),
+            ]);
 
-        if($role){
+            $permissions = $request->input('permissions', []);
+            if (!empty($permissions)) {
+                $role->syncPermissions($permissions);
+            }
 
-            $data = [
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Role updated successfully!',
-                'data' => $role
-            ];
-
-        }else{
-
-            $data = [
+                'data' => $role,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
                 'status' => 'error',
                 'message' => 'Unable to update role. Please try again!',
-            ];
-
+            ], 500);
         }
-
-        return response()->json($data);
     }
 
     /**
@@ -173,14 +143,19 @@ class RolesController extends Controller
      */
     public function destroy(string $id)
     {
-        $role = Role::findOrFail($id);
-        $role->delete();
+        try {
+            $role = Role::findOrFail($id);
+            $role->delete();
 
-        $data = [
-            'status' => 'success',
-            'message' => 'Role deleted successfully!',
-        ];
-
-        return response()->json($data);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Role deleted successfully!',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unable to delete role. Please try again!',
+            ], 500);
+        }
     }
 }

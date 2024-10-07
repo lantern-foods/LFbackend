@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use DB;
 
 class AuthController extends Controller
 {
@@ -14,42 +13,29 @@ class AuthController extends Controller
      */
     public function authenticate(Request $request)
     {
-        $username=$request->input('username');
-        $password=$request->input('password');
+        // Validate input fields
+        $request->validate([
+            'username' => 'required|string',
+            'password' => 'required|string',
+        ]);
 
-        if(empty($username)){
+        $credentials = $request->only('username', 'password');
 
-            $data = [
-                'status' => 'error',
-                'message' => 'Username is required!',
+        // Attempt to authenticate the user
+        if (Auth::guard('web')->attempt(array_merge($credentials, ['is_active' => 1]))) {
+            // Generate a token for the authenticated user
+            $token = auth()->user()->createToken('Auth Token')->accessToken;
+
+            $response = [
+                'status' => 'success',
+                'status_code' => 200,
+                'token' => $token,
+                'user' => auth()->user()->only(['id', 'username', 'email', 'name']), // Limit exposed user data
             ];
-
-            return response()->json($data);
-
-        }elseif(empty($password)){
-
-            $data = [
-                'status' => 'error',
-                'message' => 'Password is required!',
-            ];
-
-            return response()->json($data);
-        }
-
-        if (Auth::guard('web')->attempt(['username' => $username, 'password' => $password,'is_active' => 1])) {
-
-            $token = auth('web')->user()->createToken('Auth Token')->accessToken;
-
-            $response=[
-                'status'=>'success',
-                'status_code'=>200,
-                'token'=>$token,
-                'user'=>DB::table('users')->where('username', '=', $username)->first(),
-            ];
-        }else{
-            $response=[
-                'status'=>'Unauthorized',
-                'status_code'=>401
+        } else {
+            $response = [
+                'status' => 'Unauthorized',
+                'status_code' => 401,
             ];
         }
 
@@ -57,18 +43,18 @@ class AuthController extends Controller
     }
 
     /**
-     * Logout 
+     * Logout
      */
     public function logout(Request $request)
     {
+        // Revoke the token for the authenticated user
         $request->user()->token()->revoke();
 
-        $response=[
-            'status'=>'success',
-            'message'=>'Logged out successfully'
+        $response = [
+            'status' => 'success',
+            'message' => 'Logged out successfully',
         ];
 
         return response()->json($response);
     }
-
 }
