@@ -16,55 +16,54 @@ class AuthController extends Controller
         $email = $request->input('email');
         $password = $request->input('password');
 
+        // Validate required fields
         if (empty($email)) {
-            $data = [
+            return response()->json([
                 'status' => 'error',
                 'message' => 'Email is required!',
-            ];
-
-            return response()->json($data);
-        } elseif (empty($password)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Password is required!',
-            ];
-
-            return response()->json($data);
+            ], 400);
         }
 
+        if (empty($password)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Password is required!',
+            ], 400);
+        }
+
+        // Attempt authentication
         if (Auth::guard('clients')->attempt(['email_address' => $email, 'password' => $password])) {
             $client = Auth::guard('clients')->user()->load('cook', 'customeraddress');
 
+            // Generate access token
             $token = $client->createToken('Client Token')->accessToken;
 
-            $response = [
+            return response()->json([
                 'status' => 'success',
                 'status_code' => 200,
                 'token' => $token,
                 'user' => $client,
-            ];
-        } else {
-            $response = [
-                'status' => 'Unauthorized',
-                'status_code' => 401,
-            ];
+            ]);
         }
 
-        return response()->json($response);
+        return response()->json([
+            'status' => 'error',
+            'status_code' => 401,
+            'message' => 'Unauthorized. Invalid credentials.',
+        ], 401);
     }
 
     /**
-     * Logout
+     * Logout client
      */
     public function logout(Request $request)
     {
+        // Revoke the token
         $request->user()->token()->revoke();
 
-        $response = [
+        return response()->json([
             'status' => 'success',
-            'message' => 'Logged out successfully',
-        ];
-
-        return response()->json($response);
+            'message' => 'Logged out successfully.',
+        ]);
     }
 }

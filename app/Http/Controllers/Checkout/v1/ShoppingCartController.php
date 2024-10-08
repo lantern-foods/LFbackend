@@ -16,176 +16,52 @@ use Illuminate\Support\Facades\DB;
 
 class ShoppingCartController extends Controller
 {
-    use Numbers;
-    use Orders;
+    use Numbers, Orders;
 
     /**
-     * View cart
+     * View cart (Booked Orders)
      */
     public function index()
     {
-        $client_id = Auth::id();
-
-        $meals = Cart::with(['meal.meal_images'])
-            ->where('client_id', $client_id)
-            ->whereNull('package_id')
-            ->where('selected', 0)
-            ->whereNull('shift_id')
-            ->get();
-
-        $packages = Cart::where('client_id', $client_id)
-            ->whereNotNull('package_id')
-            ->whereNull('shift_id')
-            ->where('selected', 0)
-            ->with(['package.packageMeals.meal.meal_images'])
-            ->get();
-
-        $active_address = Customeraddress::where('location_status', 1)->where('client_id', $client_id)->first();
-
-        if (!$meals->isEmpty() || !$packages->isEmpty()) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'total' => $this->computeCartTotal(),
-                'delivery_cost' => 0,
-                'address' => $active_address,
-                'meals' => $meals,
-                'packages' => $packages,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'total' => $this->computeCartTotal(),
-                'message' => 'Your cart is empty!',
-            ];
-        }
-
-        return response()->json($data);
-    }
-
-    public function index_express()
-    {
-        $client_id = Auth::id();
-
-        $meals = Cart::with(['meal.meal_images'])
-            ->where('client_id', $client_id)
-            ->whereNull('package_id')
-            ->whereNotNull('shift_id')
-            ->where('selected', 0)
-            ->get();
-
-        $packages = Cart::with(['package.packageMeals.meal.meal_images'])
-            ->where('client_id', $client_id)
-            ->whereNotNull('package_id')
-            ->whereNotNull('shift_id')
-            ->where('selected', 0)
-            ->get();
-
-        $active_address = Customeraddress::where('location_status', 1)->where('client_id', $client_id)->first();
-
-        if (!$meals->isEmpty() || !$packages->isEmpty()) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'total' => $this->computeCartTotal(),
-                'delivery_cost' => 0,
-                'address' => $active_address,
-                'meals' => $meals,
-                'packages' => $packages,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'total' => $this->computeCartTotal(),
-                'message' => 'Your cart is empty!',
-            ];
-        }
-
-        return response()->json($data);
+        return $this->getCartItems(false);
     }
 
     /**
-     * Add to cart
+     * View express cart
+     */
+    public function index_express()
+    {
+        return $this->getCartItems(true);
+    }
+
+    /**
+     * Add an item to the cart
      */
     public function store(Request $request)
     {
         $client_id = Auth::id();
         $meal_id = $request->input('meal_id');
-        $qty = $this->clean_monetary_value($request->input('qty'));
-        // TODO update the unit price from db
-        $unit_price = $this->clean_monetary_value($request->input('unit_price'));
         $package_id = $request->input('package_id');
+        $qty = $this->clean_monetary_value($request->input('qty'));
+        $unit_price = $this->clean_monetary_value($request->input('unit_price'));
         $shift_id = $request->input('shift_id');
 
-        if (!isset($meal_id) && !isset($package_id)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Invalid request!',
-            ];
-            return response()->json($data);
-        }
-        if (isset($meal_id) && isset($package_id)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Invalid request!. A cart item can either be a meal or a package',
-            ];
-            return response()->json($data);
+        // Validate request
+        $validation = $this->validateCartRequest($meal_id, $package_id, $qty, $unit_price);
+        if ($validation !== true) {
+            return response()->json($validation, 400);
         }
 
-        if (!is_numeric($qty)) {
-            $data = [
+        // Check if meal or package already exists in the cart
+        if ($this->itemExistsInCart($client_id, $meal_id, $package_id)) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Invalid quantity!',
-            ];
-
-            return response()->json($data);
-        } elseif (!is_numeric($unit_price)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Invalid price',
-            ];
-
-            return response()->json($data);
-        }
-        if (Meal::find($meal_id) == null && $package_id == null) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Meal not found',
-            ];
-            return response()->json($data);
-        }
-        if (Package::find($package_id) == null && $meal_id == null) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Package not found',
-            ];
-            return response()->json($data);
+                'message' => 'Item already in cart!',
+            ], 400);
         }
 
+        // Calculate subtotal and insert item into the cart
         $subtotal = $qty * $unit_price;
-        $similar_meal_in_cart = DB::table('cart')
-            ->where('client_id', $client_id)
-            ->where('meal_id', $meal_id)
-            ->first();
-        $similar_package_in_cart = DB::table('cart')
-            ->where('client_id', $client_id)
-            ->where('package_id', $package_id)
-            ->first();
-
-        if ($similar_meal_in_cart != null && $meal_id != null) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Meal already in cart!',
-            ];
-            return response()->json($data);
-        }
-        if ($similar_package_in_cart != null && $package_id != null) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Package already in cart!',
-            ];
-            return response()->json($data);
-        }
         $query = DB::table('cart')->insert([
             'client_id' => $client_id,
             'meal_id' => $meal_id,
@@ -198,23 +74,12 @@ class ShoppingCartController extends Controller
             'updated_at' => Carbon::now(),
         ]);
 
-        if ($query) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Item added to cart!',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'An problem was encountered, meal was NOT added to cart. Please try again!',
-            ];
-        }
-
-        return response()->json($data);
+        return $query ? response()->json(['status' => 'success', 'message' => 'Item added to cart!']) :
+            response()->json(['status' => 'error', 'message' => 'Failed to add item to cart. Please try again!'], 500);
     }
 
     /**
-     * Fetch meal for editing.
+     * Edit a meal in the cart
      */
     public function edit($id)
     {
@@ -224,48 +89,27 @@ class ShoppingCartController extends Controller
             ->where('cart.id', $id)
             ->first();
 
-        if (!empty($meal)) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => $meal,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to retrieve meal for editing, please try again!',
-            ];
-        }
-
-        return response()->json($data);
+        return $meal ? response()->json(['status' => 'success', 'message' => 'Request successful!', 'data' => $meal]) :
+            response()->json(['status' => 'no_data', 'message' => 'Unable to retrieve meal for editing, please try again!'], 404);
     }
 
     /**
-     * Update cart
+     * Update cart item
      */
     public function update(Request $request, $id)
     {
         $qty = $this->clean_monetary_value($request->input('qty'));
         $unit_price = $this->clean_monetary_value($request->input('unit_price'));
 
-        if (!is_numeric($qty)) {
-            $data = [
+        // Validate quantity and price
+        if (!is_numeric($qty) || !is_numeric($unit_price)) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Invalid quantity!',
-            ];
-
-            return response()->json($data);
-        } elseif (!is_numeric($unit_price)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Invalid price',
-            ];
-
-            return response()->json($data);
+                'message' => 'Invalid quantity or price!',
+            ], 400);
         }
 
         $subtotal = $qty * $unit_price;
-
         $query = DB::table('cart')
             ->where('cart.id', $id)
             ->update([
@@ -275,216 +119,93 @@ class ShoppingCartController extends Controller
                 'updated_at' => Carbon::now(),
             ]);
 
-        if ($query) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Meal updated successfully!',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'An problem was encountered, meal was NOT updated. Please try again!',
-            ];
-        }
-
-        return response()->json($data);
+        return $query ? response()->json(['status' => 'success', 'message' => 'Item updated successfully!']) :
+            response()->json(['status' => 'error', 'message' => 'Failed to update item. Please try again!'], 500);
     }
 
-    protected function updateCartTotal()
-    {
-        $client_id = Auth::id();
-        $total = $this->computeCartTotal();
-        $query = DB::table('carts')->where('client_id', $client_id)->update(['total' => $total]);
-        return $query;
-    }
-
-    protected function computeCartTotal()
-    {
-        $client_id = Auth::id();
-
-        $meals = Cart::with(['meal'])
-            ->where('client_id', $client_id)
-            ->where('package_id', null)
-            ->where('selected', 0)
-            ->get();
-
-        $packages = Cart::with(['package.packageMeals.meal'])
-            ->where('client_id', $client_id)
-            ->where('package_id', '!=', null)
-            ->where('selected', 0)
-            ->get();
-
-        $total = 0;
-
-        foreach ($meals as $meal) {
-            $total += $meal->subtotal;
-        }
-        foreach ($packages as $package) {
-            $total += $package->subtotal;
-        }
-
-        return $total;
-    }
-
-    protected function computeSelectedCartTotal()
-    {
-        $client_id = Auth::id();
-
-        $meals = Cart::with(['meal'])
-            ->where('client_id', $client_id)
-            ->where('package_id', null)
-            ->where('selected', 1)
-            ->get();
-
-        $packages = Cart::with(['package.packageMeals.meal'])
-            ->where('client_id', $client_id)
-            ->where('package_id', '!=', null)
-            ->where('selected', 1)
-            ->get();
-
-        $total = 0;
-
-        foreach ($meals as $meal) {
-            $total += $meal->subtotal;
-        }
-        foreach ($packages as $package) {
-            $total += $package->subtotal;
-        }
-
-        return $total;
-    }
-    /** Remove from cart */
-
-    // protected function
+    /**
+     * Remove an item from the cart
+     */
     public function removeFromCart(Request $request)
     {
         $client_id = Auth::id();
         $meal_id = $request->input('meal_id');
         $package_id = $request->input('package_id');
 
-        // check if meal_id is not null
-
-        if (!isset($meal_id) && !isset($package_id)) {
-            $data = [
+        if (!$meal_id && !$package_id) {
+            return response()->json([
                 'status' => 'error',
                 'message' => 'Invalid request!',
-            ];
-            return response()->json($data);
-        }
-        if (!isset($meal_id)) {
-            $query = DB::table('cart')->where('client_id', $client_id)->where('meal_id', $meal_id)->delete();
-        }
-        if (!isset($package_id)) {
-            $query = DB::table('cart')->where('client_id', $client_id)->where('package_id', $package_id)->delete();
+            ], 400);
         }
 
-        if ($query) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Item removed from cart successfully!',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'An problem was encountered, item was NOT removed from cart. Please try again!',
-            ];
-        }
+        $query = $meal_id ?
+            DB::table('cart')->where('client_id', $client_id)->where('meal_id', $meal_id)->delete() :
+            DB::table('cart')->where('client_id', $client_id)->where('package_id', $package_id)->delete();
 
-        return response()->json($data);
+        return $query ? response()->json(['status' => 'success', 'message' => 'Item removed from cart successfully!']) :
+            response()->json(['status' => 'error', 'message' => 'Failed to remove item. Please try again!'], 500);
     }
 
     /**
-     * Delete from cart
+     * Delete cart item
      */
     public function delete($id)
     {
-        $query = DB::table('cart')->where('cart.id', $id)->delete();
+        $query = DB::table('cart')->where('id', $id)->delete();
 
-        if ($query) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Cart item deleted successfully!',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'An problem was encountered, cart item was NOT deleted. Please try again!',
-            ];
-        }
-
-        return response()->json($data);
+        return $query ? response()->json(['status' => 'success', 'message' => 'Cart item deleted successfully!']) :
+            response()->json(['status' => 'error', 'message' => 'Failed to delete cart item. Please try again!'], 500);
     }
 
+    /**
+     * Submit final cart data for booked orders
+     */
     public function submitFinalCartData(Request $request)
     {
-        $client_id = Auth::id();
-        $address_id = $request->input('address_id');
-        $delivery_date = $request->input('delivery_date');
-        $delivery_time = $request->input('delivery_time');
-        $payment_method = $request->input('order_note');
-        $meals_to_update = $request->input('meals', []);
-        $packages_to_update = $request->input('packages', []);
-        if (!Cart::where('client_id', $client_id)->exists()) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Cart is empty!',
-            ];
-            return response()->json($data);
-        }
-        if ($packages_to_update == [] && $meals_to_update == []) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Please select items to checkout',
-            ];
-            return response()->json($data);
-        }
-
-        foreach ($meals_to_update as $meal) {
-            DB::table('cart')
-                ->where('client_id', $client_id)
-                ->where('id', $meal['cart_meal_item_id'])
-                ->update(['selected' => 1, 'qty' => $meal['final_quantity'], 'subtotal' => $this->updateCartItemSubtotal($meal['cart_meal_item_id'], $meal['final_quantity'])]);
-        }
-        foreach ($packages_to_update as $package) {
-            DB::table('cart')
-                ->where('client_id', $client_id)
-                ->where('id', $package['cart_package_item_id'])
-                ->update([
-                    'selected' => 1,
-                    'qty' => $package['final_quantity'],
-                    'subtotal' => $this->updateCartItemSubtotal($package['cart_package_item_id'], $package['final_quantity']),
-                ]);
-        }
-
-        $create_order_res = $this->createBookedOrderAction($request);
-
-        return $create_order_res;
+        return $this->submitCartData($request, false);
     }
 
+    /**
+     * Submit final cart data for express orders
+     */
     public function submitFinalCartDataExpress(Request $request)
     {
-        $client_id = Auth::id();
+        return $this->submitCartData($request, true);
+    }
 
-        $address_id = $request->input('address_id');
-        $delivery_date = $request->input('delivery_date');
-        $delivery_time = $request->input('delivery_time');
-        $payment_method = $request->input('order_note');
+    /**
+     * Helper: Submit final cart data (booked/express)
+     */
+    private function submitCartData(Request $request, bool $isExpress)
+    {
+        $client_id = Auth::id();
         $meals_to_update = $request->input('meals', []);
         $packages_to_update = $request->input('packages', []);
-        if (!Cart::where('client_id', $client_id)->exists()) {
-            $data = [
+
+        if (empty($meals_to_update) && empty($packages_to_update)) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Cart is empty!',
-            ];
-            return response()->json($data);
+                'message' => 'Please select items to checkout',
+            ], 400);
         }
+
+        // Update meals and packages in the cart
         foreach ($meals_to_update as $meal) {
             DB::table('cart')
                 ->where('client_id', $client_id)
                 ->where('id', $meal['cart_meal_item_id'])
-                ->update(['selected' => 1, 'qty' => $meal['final_quantity'], 'subtotal' => $this->updateCartItemSubtotal($meal['cart_meal_item_id'], $meal['final_quantity'])]);
-            $this->mealActionOnCheckout($meal['cart_meal_item_id']);
+                ->update([
+                    'selected' => 1,
+                    'qty' => $meal['final_quantity'],
+                    'subtotal' => $this->updateCartItemSubtotal($meal['cart_meal_item_id'], $meal['final_quantity']),
+                ]);
+
+            if ($isExpress) {
+                $this->mealActionOnCheckout($meal['cart_meal_item_id']);
+            }
         }
+
         foreach ($packages_to_update as $package) {
             DB::table('cart')
                 ->where('client_id', $client_id)
@@ -494,57 +215,121 @@ class ShoppingCartController extends Controller
                     'qty' => $package['final_quantity'],
                     'subtotal' => $this->updateCartItemSubtotal($package['cart_package_item_id'], $package['final_quantity']),
                 ]);
-            $this->packageActionOnCheckout($package['cart_package_item_id']);
+
+            if ($isExpress) {
+                $this->packageActionOnCheckout($package['cart_package_item_id']);
+            }
         }
-        // $data = [
 
-        //     'status' => 'success',
-        //     'message' => 'Cart items updated successfully!',
-        // ];
-
-        $create_order_res = $this->createExpressOrderAction($request);
-
-        return $create_order_res;
+        // Create the order based on the type (booked/express)
+        return $isExpress ? $this->createExpressOrderAction($request) : $this->createBookedOrderAction($request);
     }
 
+    /**
+     * Helper: Calculate subtotal for a cart item
+     */
     private function updateCartItemSubtotal($id, $qty)
     {
         $cart_item = Cart::find($id);
-        $subtotal = $qty * $cart_item->unit_price;
-        return $subtotal;
+        return $qty * $cart_item->unit_price;
     }
 
-    public function updateAddressStatus(Request $request, string $id)
+    /**
+     * Helper: Get cart items (booked or express)
+     */
+    private function getCartItems(bool $isExpress)
     {
         $client_id = Auth::id();
 
-        // First, set all addresses for the client to location_status = 0
-        Customeraddress::where('client_id', $client_id)->update(['location_status' => 0]);
+        $meals = Cart::with(['meal.meal_images'])
+            ->where('client_id', $client_id)
+            ->whereNull('package_id')
+            ->when($isExpress, function ($query) {
+                $query->whereNotNull('shift_id');
+            }, function ($query) {
+                $query->whereNull('shift_id');
+            })
+            ->where('selected', 0)
+            ->get();
 
-        // Then, find the specific address by ID and set its location_status to 1
-        $customer_address = Customeraddress::where('id', $id)->where('client_id', $client_id)->first();
+        $packages = Cart::with(['package.packageMeals.meal.meal_images'])
+            ->where('client_id', $client_id)
+            ->whereNotNull('package_id')
+            ->when($isExpress, function ($query) {
+                $query->whereNotNull('shift_id');
+            }, function ($query) {
+                $query->whereNull('shift_id');
+            })
+            ->where('selected', 0)
+            ->get();
 
-        if (!empty($customer_address)) {
-            $customer_address->location_status = 1;
+        $active_address = Customeraddress::where('location_status', 1)
+            ->where('client_id', $client_id)
+            ->first();
 
-            if ($customer_address->save()) {  // Using save() since only one attribute is being updated
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Address status updated successfully. All other addresses have been set to inactive.',
-                ];
-            } else {
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered. Address status was NOT updated. Please try again!',
-                ];
-            }
-        } else {
-            $data = [
+        if ($meals->isEmpty() && $packages->isEmpty()) {
+            return response()->json([
                 'status' => 'no_data',
-                'message' => 'Unable to locate your address for status update. Please try again!',
+                'total' => $this->computeCartTotal(),
+                'message' => 'Your cart is empty!',
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Request successful!',
+            'total' => $this->computeCartTotal(),
+            'delivery_cost' => 0,
+            'address' => $active_address,
+            'meals' => $meals,
+            'packages' => $packages,
+        ]);
+    }
+
+    /**
+     * Helper: Check if meal or package is already in the cart
+     */
+    private function itemExistsInCart($client_id, $meal_id, $package_id)
+    {
+        $mealExists = DB::table('cart')
+            ->where('client_id', $client_id)
+            ->where('meal_id', $meal_id)
+            ->exists();
+
+        $packageExists = DB::table('cart')
+            ->where('client_id', $client_id)
+            ->where('package_id', $package_id)
+            ->exists();
+
+        return $mealExists || $packageExists;
+    }
+
+    /**
+     * Helper: Validate cart request data
+     */
+    private function validateCartRequest($meal_id, $package_id, $qty, $unit_price)
+    {
+        if (!isset($meal_id) && !isset($package_id)) {
+            return [
+                'status' => 'error',
+                'message' => 'Invalid request! Item must be either a meal or a package.',
             ];
         }
 
-        return response()->json($data);
+        if (isset($meal_id) && isset($package_id)) {
+            return [
+                'status' => 'error',
+                'message' => 'Invalid request! A cart item can either be a meal or a package, not both.',
+            ];
+        }
+
+        if (!is_numeric($qty) || !is_numeric($unit_price)) {
+            return [
+                'status' => 'error',
+                'message' => 'Invalid quantity or price!',
+            ];
+        }
+
+        return true;
     }
 }

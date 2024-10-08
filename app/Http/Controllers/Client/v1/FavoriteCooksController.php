@@ -5,90 +5,101 @@ namespace App\Http\Controllers\Client\v1;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\FavoriteCook;
-use Illuminate\Support\Facades\Auth ;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+
 class FavoriteCooksController extends Controller
 {
-    // Add a favorite cook
+    /**
+     * Add a favorite cook.
+     */
     public function store(Request $request)
     {
         $request->validate([
             'cook_id' => 'required|integer',
         ]);
 
+        $client_id = Auth::id();
+        $cook_id = $request->input('cook_id');
+
+        // Check if the cook is already added as a favorite
+        $existing_favorite = FavoriteCook::where('client_id', $client_id)
+            ->where('cook_id', $cook_id)
+            ->first();
+
+        if ($existing_favorite) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cook is already in your favourites.',
+            ], 400);
+        }
+
         $favorite = new FavoriteCook();
-        $favorite->client_id = Auth::id();
-        $favorite->cook_id = $request->cook_id;
-        
+        $favorite->client_id = $client_id;
+        $favorite->cook_id = $cook_id;
 
         if ($favorite->save()) {
-            # code...
-            $data = [
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Favorite cook added successfully',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'A problem was encountered, Favorite cook was NOT created. Please try again!',
-            ];
+                'message' => 'Favorite cook added successfully.',
+            ], 200);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered, favorite cook was not added. Please try again!',
+        ], 500);
     }
 
-    // Get client's favorite cooks
+    /**
+     * Get all favorite cooks for the authenticated client.
+     */
     public function index()
     {
-        $favorites_cooks = FavoriteCook::where('client_id', Auth::id())
-        // ->with('cook')
-        ->orderBy('id', 'desc')
-        ->get();
-        return response()->json($favorites_cooks);
+        $client_id = Auth::id();
+        $favorite_cooks = FavoriteCook::where('client_id', $client_id)
+            ->with('cook') // Assuming you want to include cook details
+            ->orderBy('id', 'desc')
+            ->get();
 
-       if (!$favorites_cooks->isEmpty()) {
-
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $favorites_cooks,
-            ];
-        } else {
-            $data = [
+        if ($favorite_cooks->isEmpty()) {
+            return response()->json([
                 'status' => 'no_data',
-                'message' => 'No records',
-            ];
+                'message' => 'No favorite cooks found.',
+            ], 404);
         }
 
-        return response()->json($data);
-
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Request successful.',
+            'data' => $favorite_cooks,
+        ], 200);
     }
 
-    // Delete a favorite cook
+    /**
+     * Delete a favorite cook.
+     */
     public function destroy($id)
     {
-        $favorite = FavoriteCook::where('id', $id)->where('client_id', Auth::id())->first();
+        $client_id = Auth::id();
+        $favorite = FavoriteCook::where('id', $id)->where('client_id', $client_id)->first();
 
         if (!$favorite) {
-            if ( $favorite->delete()) {
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Favorite cook deleted successfully',
-                ];
-            } else {
-                // If the delete operation fails for some reason
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered. Favorite cook was NOT deleted. Please try again!',
-                ];
-            }
-        } else {
-            // If no address matches the criteria (not found or doesn't belong to client)
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to locate your address for deletion. Please try again!',
-            ];
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Favorite cook not found or you do not have permission to delete it.',
+            ], 404);
         }
 
-        return response()->json($data);
+        if ($favorite->delete()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Favorite cook deleted successfully.',
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered, favorite cook was not deleted. Please try again!',
+        ], 500);
     }
 }

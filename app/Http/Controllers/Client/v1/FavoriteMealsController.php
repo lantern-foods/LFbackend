@@ -4,86 +4,101 @@ namespace App\Http\Controllers\Client\v1;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\FavoriteMeal; // Ensure you have a FavoriteMeal model
-
+use App\Models\FavoriteMeal;
 use Illuminate\Support\Facades\Auth;
 
 class FavoriteMealsController extends Controller
 {
-    // Add a favorite meal
+    /**
+     * Add a favorite meal.
+     */
     public function store(Request $request)
     {
         $request->validate([
             'meal_id' => 'required|integer',
         ]);
 
+        $client_id = Auth::id();
+        $meal_id = $request->input('meal_id');
+
+        // Check if the meal is already added as a favorite
+        $existing_favorite = FavoriteMeal::where('client_id', $client_id)
+            ->where('meal_id', $meal_id)
+            ->first();
+
+        if ($existing_favorite) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Meal is already in your favourites.',
+            ], 400);
+        }
+
         $favorite = new FavoriteMeal();
-        $favorite->client_id = Auth::id();
-        $favorite->meal_id = $request->meal_id;
+        $favorite->client_id = $client_id;
+        $favorite->meal_id = $meal_id;
 
         if ($favorite->save()) {
-            $data = [
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Favorite meal added successfully',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'A problem was encountered, Favorite meal was NOT created. Please try again!',
-            ];
+                'message' => 'Favorite meal added successfully.',
+            ], 200);
         }
 
-        return response()->json($data);
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered, favorite meal was not added. Please try again!',
+        ], 500);
     }
 
-    // Get client's favorite meals
+    /**
+     * Get all favorite meals for the authenticated client.
+     */
     public function index()
     {
-        $favorites_meals = FavoriteMeal::with('meal.meal_images')
-            ->where('client_id', Auth::id())->get();
+        $client_id = Auth::id();
+        $favorite_meals = FavoriteMeal::with('meal.meal_images')
+            ->where('client_id', $client_id)
+            ->get();
 
-        if (!$favorites_meals->isEmpty()) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $favorites_meals,
-            ];
-        } else {
-            $data = [
+        if ($favorite_meals->isEmpty()) {
+            return response()->json([
                 'status' => 'no_data',
-                'message' => 'No records',
-            ];
+                'message' => 'No favorite meals found.',
+            ], 404);
         }
 
-        return response()->json($data);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Request successful.',
+            'data' => $favorite_meals,
+        ], 200);
     }
 
-    // Delete a favorite meal
+    /**
+     * Delete a favorite meal.
+     */
     public function destroy($id)
     {
-        $favorite = FavoriteMeal::where('id', $id)->where('client_id', Auth::id())->first();
+        $client_id = Auth::id();
+        $favorite = FavoriteMeal::where('id', $id)->where('client_id', $client_id)->first();
 
-        if ($favorite) {
-            if ($favorite->delete()) {
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Favorite meal deleted successfully',
-                ];
-            } else {
-                // If the delete operation fails for some reason
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered. Favorite meal was NOT deleted. Please try again!',
-                ];
-            }
-        } else {
-            // If no favorite meal matches the criteria (not found or doesn't belong to client)
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to locate the favorite meal for deletion. Please try again!',
-            ];
+        if (!$favorite) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Favorite meal not found or you do not have permission to delete it.',
+            ], 404);
         }
 
-        return response()->json($data);
+        if ($favorite->delete()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Favorite meal deleted successfully.',
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered, favorite meal was not deleted. Please try again!',
+        ], 500);
     }
 }

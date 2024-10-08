@@ -6,71 +6,71 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Http\Request;
 
-class ClientverificationController extends Controller
+class ClientVerificationController extends Controller
 {
-    //
+    /**
+     * Verify OTP for client email address.
+     */
     public function verifyOtp(Request $request)
     {
         $request->validate([
+            'email_address' => 'required|email',
             'otp' => 'required|digits:6',
         ]);
 
-        // Find the client based on the provided email address
-        $client = Client::where('email_address', '=', $request->input('email_address'))->first();
+        // Find the client by the provided email address
+        $client = Client::where('email_address', $request->input('email_address'))->first();
 
         if (!$client) {
-            $data = [
+            return response()->json([
                 'status' => 'no_data',
-                'message' => 'No records',
-            ];
-
+                'message' => 'No client record found.',
+            ], 404);
         }
 
-        // Check if the provided OTP matches the stored OTP for the client
+        // Verify if the OTP matches
         if ($client->client_otp != $request->input('otp')) {
-            $data = [
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Invalid OTP',
-            ];
-
-        } else {
-            // Clear the OTP after successful verification
-            $client->update(['client_otp' => null]);
-
-            $data = [
-                'status' => 'success',
-                'message' => 'OTP verified successfully',
-            ];
+                'message' => 'Invalid OTP.',
+            ], 400);
         }
 
-        return response()->json($data);
+        // Clear the OTP after successful verification
+        $client->update(['client_otp' => null]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'OTP verified successfully.',
+        ], 200);
     }
 
+    /**
+     * Set a new password for the client.
+     */
     public function setPassword(Request $request)
     {
         $request->validate([
+            'email_address' => 'required|email',
             'password' => 'required|min:6',
-            'email_address' => 'required',
         ]);
 
-        $client = Client::where('email_address','=', $request->input('email_address'))->first();
+        // Find the client by the provided email address
+        $client = Client::where('email_address', $request->input('email_address'))->first();
 
         if (!$client) {
-            $data = [
+            return response()->json([
                 'status' => 'no_data',
-                'message' => 'No records',
-            ];
-        } else {
-            $password = $request->input('password');
-            $client->update(['password' => bcrypt($password)]);
-
-            $data = [
-                'status' => 'success',
-                'message' => 'Password set successfully',
-            ];
+                'message' => 'No client record found.',
+            ], 404);
         }
 
-        return response()->json($data);
+        // Update the password
+        $client->update(['password' => bcrypt($request->input('password'))]);
 
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Password set successfully.',
+        ], 200);
     }
 }
