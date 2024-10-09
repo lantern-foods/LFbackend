@@ -22,20 +22,20 @@ class MealImageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            
             'meal_id' => 'required',
-            'image_url.*' => 'required',
+            'image_url.*' => 'required|mimes:jpeg,png,jpg', // Ensure the uploaded files are images
         ];
     }
 
     /**
-     * Rules messages
+     * Custom messages for validation rules.
      */
     public function messages(): array
     {
         return [
             'meal_id.required' => 'Meal\'s id is required',
-            'image_url.required' => 'Meal\'s images is required',
+            'image_url.required' => 'At least one meal image is required',
+            'image_url.mimes' => 'Each meal image must be in jpeg, png, or jpg format',
         ];
     }
 }

@@ -9,7 +9,7 @@ use App\Models\Vehicle;
 use App\Models\Driver;
 use Illuminate\Support\Facades\DB;
 
-class vehilceallocationController extends Controller
+class VehicleAllocationController extends Controller
 {
     /**
      * Allocate a vehicle to a driver and update the vehicle's status.
@@ -20,65 +20,69 @@ class vehilceallocationController extends Controller
     public function allocate(Request $request)
     {
         $request->validate([
-            'driver_id' => 'required',
-            'vehicle_id' => 'required',
+            'driver_id' => 'required|exists:drivers,id',
+            'vehicle_id' => 'required|exists:vehicles,id',
         ]);
 
         DB::beginTransaction();
 
         try {
+            $driverId = $request->input('driver_id');
+            $vehicleId = $request->input('vehicle_id');
+
             // Check if the driver already has a vehicle allocated
-            $allocation = Vehicleallocation::where('driver_id', $request->input('driver_id'))->first();
+            $allocation = Vehicleallocation::where('driver_id', $driverId)->first();
 
             if ($allocation) {
-                // Update the existing allocation if the driver already has a vehicle
-                $allocation->vehicle_id = $request->input('vehicle_id');
+                // Update existing allocation
+                $allocation->vehicle_id = $vehicleId;
                 $allocation->save();
-
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Driver allocated successfully',
-                   
-                ];
+                $message = 'Driver reallocated to a new vehicle successfully.';
             } else {
-                // Create a new allocation if the driver doesn't have a vehicle yet
+                // Create a new allocation
                 Vehicleallocation::create([
-                    'driver_id' => $request->input('driver_id'),
-                    'vehicle_id' => $request->input('vehicle_id'),
+                    'driver_id' => $driverId,
+                    'vehicle_id' => $vehicleId,
                 ]);
-
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Driver allocated successfully',
-                   
-                ];
+                $message = 'Driver allocated to vehicle successfully.';
             }
 
-            // Update the vehicle's status to 1 (allocated)
-            $vehicle = Vehicle::find($request->vehicle_id);
-            $vehicle->vehicle_status = 1; // Assuming 'status' is the column name for the vehicle's allocation status
+            // Update the vehicle's status to 'allocated' (assuming 1 is for allocated)
+            $vehicle = Vehicle::findOrFail($vehicleId);
+            $vehicle->vehicle_status = 1; // Mark as allocated
             $vehicle->save();
 
             DB::commit();
 
-            return response()->json($data);
+            return response()->json([
+                'status' => 'success',
+                'message' => $message,
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            $data = [
+
+            return response()->json([
                 'status' => 'error',
-                'message' => 'A problem was encountered, Driver was NOT created. Please try again!',
-                'data' => $e
-            ];
-            return response()->json($data);
+                'message' => 'A problem was encountered. The vehicle allocation failed. Please try again!',
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 
+    /**
+     * Get a list of all drivers with and without vehicles.
+     *
+     * @return \Illuminate\Http\Response
+     */
     public function allocatedDrivers()
     {
-        $allocated_drivers = Driver::with('vehicle')->get();
-
+        $allocatedDrivers = Driver::with('vehicle')->get();
         $driversWithoutVehicles = Driver::doesntHave('vehicle')->get();
 
-        return $allocated_drivers;
+        return response()->json([
+            'status' => 'success',
+            'allocated_drivers' => $allocatedDrivers,
+            'drivers_without_vehicles' => $driversWithoutVehicles,
+        ]);
     }
 }

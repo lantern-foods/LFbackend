@@ -22,23 +22,27 @@ class MealUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'meal_price' => 'required',
-            'min_qty' => 'required',
-            'max_qty' => 'required',
+            'meal_price' => 'required|numeric|min:0',
+            'min_qty' => 'required|integer|min:1',
+            'max_qty' => 'required|integer|gte:min_qty',
         ];
     }
 
-    /*
-     *
-     * Rules messages 
+    /**
+     * Custom messages for validation rules.
      */
-    public function messages():array
+    public function messages(): array
     {
         return [
             'meal_price.required' => 'Meal\'s price is required!',
+            'meal_price.numeric' => 'Meal\'s price must be a numeric value!',
+            'meal_price.min' => 'Meal\'s price must be at least 0!',
             'min_qty.required' => 'Meal\'s minimum quantity for order is required!',
+            'min_qty.integer' => 'Minimum quantity must be an integer!',
+            'min_qty.min' => 'Minimum quantity must be at least 1!',
             'max_qty.required' => 'Meal\'s maximum quantity for order is required!',
-            
+            'max_qty.integer' => 'Maximum quantity must be an integer!',
+            'max_qty.gte' => 'Maximum quantity must be greater than or equal to the minimum quantity!',
         ];
     }
 }

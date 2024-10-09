@@ -17,345 +17,229 @@ use Illuminate\Http\Request;
 class PackageController extends Controller
 {
     use Cooks;
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
         $packages = Package::with('packageMeals.meal.meal_images')->get();
+
         foreach ($packages as $package) {
             $shift_package = ShiftPackage::where('package_id', $package->id)->first();
             $package->shift_id = $shift_package->shift_id ?? null;
         }
 
-        if (!$packages->isEmpty()) {
-
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $packages,
-            ];
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
-        }
-        return response()->json($data);
+        return response()->json([
+            'status' => !$packages->isEmpty() ? 'success' : 'no_data',
+            'message' => !$packages->isEmpty() ? 'Request successful' : 'No records found',
+            'data' => $packages,
+        ]);
     }
 
     /**
      * Store a newly created resource in storage.
      */
+    public function create(PackageRequest $request)
+    {
+        $request->validated();
+        $cook = Cook::find($request->input('cook_id'));
+
+        if (!$cook) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cook not found',
+            ]);
+        }
+
+        $meals = $request->input('meals');
+        if (empty($meals)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No meals selected',
+            ]);
+        }
+
+        $package = Package::create([
+            'cook_id' => $cook->id,
+            'package_name' => $request->input('package_name'),
+            'package_description' => $request->input('package_description'),
+            'discount' => $request->input('discount'),
+            'total_price' => $this->computeMealPrice($meals),
+        ]);
+
+        $this->createPackageMeals($meals, $package->id);
+        $this->decrementMealsOnCreatePackage($package->id);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Package created successfully',
+            'package' => Package::with('packageMeals.meal')->find($package->id),
+        ]);
+    }
+
+    /**
+     * Edit an existing package.
+     */
+    public function editPackage(PackageRequest $request)
+    {
+        $request->validated();
+
+        $package = Package::find($request->input('package_id'));
+
+        if (!$package) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Package not found',
+            ]);
+        }
+
+        $meals = $request->input('meals');
+        if (empty($meals)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No meals selected',
+            ]);
+        }
+
+        $package->update([
+            'package_name' => $request->input('package_name'),
+            'package_description' => $request->input('package_description'),
+            'discount' => $this->computePackageDiscount($request->input('total_price'), $meals),
+            'total_price' => $request->input('total_price'),
+        ]);
+
+        $this->createPackageMeals($meals, $package->id);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Package updated successfully',
+            'package' => Package::with('packageMeals.meal')->find($package->id),
+        ]);
+    }
+
+    /**
+     * Compute the total price of the meals.
+     */
     protected function computeMealPrice($meals)
     {
         $price = 0;
         foreach ($meals as $meal) {
-
-            $mealId = $meal['meal_id'];
-            $quantity = $meal['quantity'];
-            $mealInfo = Meal::find($mealId);
-            if ($meal) {
-                $price += $mealInfo->meal_price * $quantity;
+            $mealInfo = Meal::find($meal['meal_id']);
+            if ($mealInfo) {
+                $price += $mealInfo->meal_price * $meal['quantity'];
             }
         }
         return $price;
     }
+
+    /**
+     * Compute package discount based on total price.
+     */
     protected function computePackageDiscount($enteredPrice, $meals)
     {
-
-        $discount = $this->computeMealPrice($meals) - $enteredPrice;
-        if ($discount < 0) {
-            $discount = 0;
-        }
-        return  $discount;
-    }
-    protected function createPackageMeal($meals, $packageId)
-    {
-
-        foreach ($meals as $meal) {
-            $packageMeal = PackageMeal::where('meal_id', $meal['meal_id'])->where('package_id', $packageId)->first();
-            if (empty($packageMeal)) {
-                PackageMeal::create([
-                    'meal_id' => $meal['meal_id'],
-                    'quantity' => $meal['quantity'],
-                    'package_id' => $packageId,
-                ]);
-            } else {
-                $packageMeal->quantity += $meal['quantity'];
-                $packageMeal->save();
-            }
-        }
-    }
-    public function create(PackageRequest $request)
-    {
-        $request->validated();
-        $cookId = $request->input('cook_id');
-        $packageName = $request->input('package_name');
-        $packageDescription = $request->input('package_description');
-        $discount = $request->input('discount');
-        $totalPrice = $request->input('total_price');
-
-
-        $cook = Cook::where('id', $cookId)->first();
-        if (empty($cook)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Cook not found',
-            ];
-            return response()->json($data);
-        }
-        $meals = $request->input('meals');
-        if (empty($meals)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'No meals selected',
-            ];
-
-
-            return response()->json($data);
-        }
-        $package = Package::create([
-            'cook_id' => $cookId,
-            'package_name' => $packageName,
-            'package_description' => $packageDescription,
-            'discount' => $discount,
-            'total_price' => $this->computeMealPrice($meals),
-
-        ]);
-
-        $packageId = $package->id;;
-
-
-        $this->createPackageMeal($meals, $packageId);
-        $this->decrementMealsOnCreatePackage($packageId);
-        $packageWithMeals = Package::with('packageMeals.meal')->find($packageId);
-        $data = [
-            'status' => 'success',
-            'message' => 'Package created successfully',
-            'package' => $packageWithMeals,
-        ];
-        return response()->json($data);
-    }
-    public function editPackage(PackageRequest $request)
-    {
-        $request->validated();
-        $packageId = $request->input('package_id');
-        $packageName = $request->input('package_name');
-        $packageDescription = $request->input('package_description');
-        $discount = $request->input('discount');
-        $totalPrice = $request->input('total_price');
-
-        $package = Package::find($packageId);
-        if (empty($package)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Package not found',
-            ];
-            return response()->json($data);
-        }
-
-        $meals = $request->input('meals');
-        if (empty($meals)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'No meals selected',
-            ];
-
-
-            return response()->json($data);
-        }
-
-        $package->package_name = $packageName;
-        $package->package_description = $packageDescription;
-        $package->discount
-            = $this->computePackageDiscount($totalPrice, $meals);
-        $package->total_price = $totalPrice;
-        $package->save();
-
-        $meals = $request->input('meals');
-        if (!empty($meals)) {
-            $this->createPackageMeal($meals, $packageId);
-        }
-
-        $packageWithMeals = Package::with('packageMeals.meal')->find($packageId);
-        $data = [
-            'status' => 'success',
-            'message' => 'Package updated successfully',
-            'package' => $packageWithMeals,
-        ];
-        return response()->json($data);
-    }
-
-
-    public function store(PackageRequest $request)
-    {
-        $request->validated();
-
-        // Extract the required inputs
-        $cookId = $request->input('cook_id');
-        $packageName = $request->input('package_name');
-        $packageDescription = $request->input('package_description');
-        $discount = $request->input('discount');
-        $totalPrice = $request->input('total_price');
-
-        // Create a new package record
-        $package = Package::create([
-            'cook_id' => $cookId,
-            'package_name' => $packageName,
-            'package_description' => $packageDescription,
-            'discount' => $discount,
-            'total_price' => $totalPrice,
-        ]);
-
-        // Get the ID of the newly created package
-        $packageId = $package->id;
-
-
-        // Retrieve the package details from the request
-        $packageDetails = $request->input('package_details');
-        if (is_array($packageDetails)) {
-            foreach ($packageDetails as $detail) {
-                // Assume $detail is an array that contains 'meal_id'.
-                // Make sure to validate or sanitize this input as needed.
-                PackageMeal::create([
-                    'package_id' => $packageId,
-                    'meal_id' => $detail['meal_id'],
-                ]);
-            }
-            $data = [
-                'status' => 'success',
-                'message' => 'Package created successfully',
-
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'A problem was encountered, account was NOT created. Please try again!',
-            ];
-        }
-        return response()->json($data);
+        $mealPrice = $this->computeMealPrice($meals);
+        return max(0, $mealPrice - $enteredPrice);
     }
 
     /**
-     * Display the specified resource.
+     * Create or update meals in the package.
+     */
+    protected function createPackageMeals($meals, $packageId)
+    {
+        foreach ($meals as $meal) {
+            $packageMeal = PackageMeal::firstOrCreate([
+                'meal_id' => $meal['meal_id'],
+                'package_id' => $packageId,
+            ], ['quantity' => $meal['quantity']]);
+
+            $packageMeal->increment('quantity', $meal['quantity']);
+        }
+    }
+
+    /**
+     * Display a specific package.
      */
     public function show(string $id)
     {
-        $package = Package::where('id', $id)->first();
+        $package = Package::with('packageMeals.meal.meal_images')->find($id);
 
-        if (!empty($package)) {
-
-            $package_details = Packagedetail::where('package_id', $id)->get();
-
-            $data = [
+        if ($package) {
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful!',
-                'data' => [
-                    'package' => $package, // Include the package data
-                    'package_details' => $package_details, // Include the package details
-                ],
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to view packages. Please try again!',
-            ];
+                'data' => $package,
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Package not found!',
+        ]);
     }
 
     /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        $package = Package::where('id', $id)->first();
-
-        if (!empty($package)) {
-
-            $package_details = Packagedetail::where('package_id', $id)->get();
-
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => [
-                    'package' => $package, // Include the package data
-                    'package_details' => $package_details, // Include the package details
-                ],
-            ];
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load your package data. Please try again!',
-            ];
-        }
-        return response()->json($data);
-    }
-
-    /**
-     * Update the specified resource in storage.
+     * Update the specified package.
      */
     public function update(PackageEditRequest $request, string $id)
     {
         $request->validated();
 
-        $packageName = $request->input('package_name');
-        $packageDescription = $request->input('package_description');
-        $discount = $request->input('discount');
-        $totalPrice = $request->input('total_price');
-        $packageDetailsArray = $request->input('package_details', []);
-
-        $package = Package::where('id', $id)->first();
-
-        if (!empty($package)) {
-
-            $package->package_name = $packageName;
-            $package->package_description = $packageDescription;
-            $package->discount = $discount;
-            $package->total_price = $totalPrice;
-
-            if ($package->update()) {
-                // Update existing package details
-                foreach ($packageDetailsArray as $detail) {
-                    if (isset($detail['id'])) {
-                        // Update existing detail
-                        Packagedetail::where('id', $detail['id'])->update(['meal_id' => $detail['meal_id']]);
-                    }
-                }
-
-                $detailIds = array_filter(array_column($packageDetailsArray, 'id'));
-                Packagedetail::where('package_id', $id)->whereNotIn('id', $detailIds)->delete();
-
-                $data = [
-
-                    'status' => 'success',
-                    'message' => 'Package updated successfully',
-                ];
-            } else {
-
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered, your package was NOT updated. Please try again!'
-                ];
-            }
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to locate your package for update. Please try again!'
-            ];
+        $package = Package::find($id);
+        if (!$package) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Package not found',
+            ]);
         }
-        return response()->json($data);
+
+        $package->update([
+            'package_name' => $request->input('package_name'),
+            'package_description' => $request->input('package_description'),
+            'discount' => $request->input('discount'),
+            'total_price' => $request->input('total_price'),
+        ]);
+
+        $this->updatePackageDetails($request->input('package_details', []), $package->id);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Package updated successfully',
+        ]);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Helper to update package details.
+     */
+    protected function updatePackageDetails($details, $packageId)
+    {
+        foreach ($details as $detail) {
+            if (isset($detail['id'])) {
+                Packagedetail::where('id', $detail['id'])->update(['meal_id' => $detail['meal_id']]);
+            }
+        }
+
+        $existingIds = array_filter(array_column($details, 'id'));
+        Packagedetail::where('package_id', $packageId)->whereNotIn('id', $existingIds)->delete();
+    }
+
+    /**
+     * Delete a package.
      */
     public function destroy(string $id)
     {
-        //
+        $package = Package::find($id);
+        if ($package) {
+            $package->delete();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Package deleted successfully',
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Package not found!',
+        ]);
     }
 }

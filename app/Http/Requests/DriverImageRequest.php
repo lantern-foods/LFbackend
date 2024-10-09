@@ -22,23 +22,30 @@ class DriverImageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'driverId' => 'required',
-            'id_front' => 'required|mimes:jpeg,png',
-            'id_back' => 'required|mimes:jpeg,png',
-            'profile_pic' => 'required|mimes:jpeg,png'
+            'driverId' => 'required|exists:drivers,id',
+            'id_front' => 'required|mimes:jpeg,png,jpg|max:2048',  // Max 2MB file size
+            'id_back' => 'required|mimes:jpeg,png,jpg|max:2048',   // Max 2MB file size
+            'profile_pic' => 'required|mimes:jpeg,png,jpg|max:2048', // Max 2MB file size
         ];
     }
 
     /**
-     * Rules messages
+     * Custom messages for validation rules.
      */
     public function messages(): array
     {
         return [
-            'driverId.required' => 'Sorry, you must be a registered delivery driver inorder to upload documents',
-            'id_front.required' => 'Cook\'s ID front face image is required',
-            'id_back.required' => 'Cook\'s ID back face image is requried',
-            'profile pic.required' => 'Cooks\'s Passport photo / profile picture is required',
+            'driverId.required' => 'You must be a registered delivery driver to upload documents.',
+            'driverId.exists' => 'The provided driver ID does not exist.',
+            'id_front.required' => 'The driver\'s ID front image is required.',
+            'id_front.mimes' => 'The ID front image must be a file of type: jpeg, png, jpg.',
+            'id_front.max' => 'The ID front image must not exceed 2MB in size.',
+            'id_back.required' => 'The driver\'s ID back image is required.',
+            'id_back.mimes' => 'The ID back image must be a file of type: jpeg, png, jpg.',
+            'id_back.max' => 'The ID back image must not exceed 2MB in size.',
+            'profile_pic.required' => 'The driver\'s profile picture is required.',
+            'profile_pic.mimes' => 'The profile picture must be a file of type: jpeg, png, jpg.',
+            'profile_pic.max' => 'The profile picture must not exceed 2MB in size.',
         ];
     }
 }

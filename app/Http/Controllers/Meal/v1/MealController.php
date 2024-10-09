@@ -22,324 +22,230 @@ use Intervention\Image\ImageManagerStatic as Image;
 class MealController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Get all express meals and packages.
      */
     public function all_cook_meals_express()
     {
-
-
         $clientId = Auth::user()->id;
+
         $meals = Meal::with('cook', 'meals_images')
             ->where('express_status', 1)
             ->get()
             ->map(function ($meal) use ($clientId) {
                 $meal->favorites_count = $meal->favorites_count ?? 0;
                 $meal->is_liked = $meal->isLikedBy($clientId);
-                $meal_rating = MealPackageRating::where('meal_id',$meal->id)->get();
-                info($meal_rating);
+                $meal_rating = MealPackageRating::where('meal_id', $meal->id)->get();
+                $meal->shift_id = Shiftmeal::where('meal_id', $meal->id)->value('shift_id');
                 return $meal;
             });
-        foreach ($meals as $meal) {
-            $shift_meal = Shiftmeal::where('meal_id', $meal->id)->first();
-            $meal->shift_id = $shift_meal->shift_id ?? null;
-        }
-        $packages = Package::with([
-            'packageMeals.meal.meal_images'
-        ])
+
+        $packages = Package::with('packageMeals.meal.meal_images')
             ->where('express_status', 1)
-            ->get();
-        foreach ($packages as $package) {
-            $shift_package = ShiftPackage::where('package_id', $package->id)->first();
-            $package->shift_id = $shift_package->shift_id ?? null;
-        }
-
-        if (!$meals->isEmpty()) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $meals,
-                'packages' => $packages,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
-        }
-        return response()->json($data);
-    }
-
-    public function index()
-    {
-
-
-        $clientId = Auth::user()->id;
-        $meals = Meal::with('cook', 'meal_images')
-            // ->where('express_status', 0)
-
             ->get()
-
-            ->map(function ($meal) use ($clientId) {
-                $meal->favorites_count = $meal->favorites_count ?? 0;
-                $meal->is_liked = $meal->isLikedBy($clientId);
-
-                $meal_rating = MealPackageRating::where('meal_id',$meal->id)->get();
-                info($meal_rating);
-                $meal->packaging = $meal_rating->avg('packaging');
-                $meal->taste = $meal_rating->avg('taste');
-                $meal->service=  $meal_rating->avg('service');
-                $meal->reviews_count = $meal_rating->count('reviews');
-                return $meal;
+            ->each(function ($package) {
+                $package->shift_id = ShiftPackage::where('package_id', $package->id)->value('shift_id');
             });
-        $packages = Package::with([
-            'packageMeals.meal.meal_images'
-        ])
-            // ->where('express_status', 0)
-            ->get();
 
-        if (!$meals->isEmpty()) {
-            $data = [
+        if (!$meals->isEmpty() || !$packages->isEmpty()) {
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful',
                 'data' => $meals,
                 'packages' => $packages,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'No records found',
+        ]);
     }
 
     /**
-     * Display a listing of the resource.
+     * Get all meals and packages.
+     */
+    public function index()
+    {
+        $clientId = Auth::user()->id;
+
+        $meals = Meal::with('cook', 'meal_images')
+            ->get()
+            ->map(function ($meal) use ($clientId) {
+                $meal->favorites_count = $meal->favorites_count ?? 0;
+                $meal->is_liked = $meal->isLikedBy($clientId);
+                $meal_rating = MealPackageRating::where('meal_id', $meal->id)->get();
+                $meal->packaging = $meal_rating->avg('packaging');
+                $meal->taste = $meal_rating->avg('taste');
+                $meal->service = $meal_rating->avg('service');
+                $meal->reviews_count = $meal_rating->count();
+                return $meal;
+            });
+
+        $packages = Package::with('packageMeals.meal.meal_images')->get();
+
+        if (!$meals->isEmpty() || !$packages->isEmpty()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Request successful',
+                'data' => $meals,
+                'packages' => $packages,
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'No records found',
+        ]);
+    }
+
+    /**
+     * Get details of a specific meal.
      */
     public function get_meals(string $id)
     {
         $clientId = Auth::user()->id;
+
         $meal = Meal::with('cook', 'meals_images')
             ->where('id', $id)
             ->get()
             ->map(function ($meal) use ($clientId) {
                 $meal->favorites_count = $meal->favorites_count ?? 0;
                 $meal->is_liked = $meal->isLikedBy($clientId);
-
-                // Fetch meal with shift_id
-                $shift_meal = Shiftmeal::where('meal_id', $meal->id)->first();
-                if ($shift_meal != null) {
-                    $meal->shift_id = $shift_meal->shift_id;
-                } else {
-                    $meal->shift_id = null;
-                }
+                $meal->shift_id = Shiftmeal::where('meal_id', $meal->id)->value('shift_id');
                 return $meal;
             });
-        // $packages = Package::with([
-        //     'packageMeals.meal.meals_images'
-        // ])->get();
 
         if (!$meal->isEmpty()) {
-            $data = [
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful',
                 'data' => $meal,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'No records found',
+        ]);
     }
 
+    /**
+     * Get meals from a specific cook.
+     */
     public function get_single_cook_meals(string $id)
     {
         $clientId = Auth::user()->id;
+
         $meal = Meal::with('cook', 'meals_images')
             ->where('id', $id)
             ->get()
             ->map(function ($meal) use ($clientId) {
                 $meal->favorites_count = $meal->favorites_count ?? 0;
                 $meal->is_liked = $meal->isLikedBy($clientId);
-
-                // Fetch meal with shift_id
-                $shift_meal = Shiftmeal::where('meal_id', $meal->id)->first();
-                if ($shift_meal != null) {
-                    $meal->shift_id = $shift_meal->shift_id;
-                } else {
-                    $meal->shift_id = null;
-                }
+                $meal->shift_id = Shiftmeal::where('meal_id', $meal->id)->value('shift_id');
                 return $meal;
             });
-        // $packages = Package::with([
-        //     'packageMeals.meal.meals_images'
-        // ])->get();
 
         if (!$meal->isEmpty()) {
-            $data = [
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful',
                 'data' => $meal,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'No records found',
+        ]);
     }
 
     /**
-     * Display a listing of the resource.
+     * Get all meals from a specific cook.
      */
     public function cook_meals(string $id)
     {
-        $cook_meals = Meal::with('meal_images')
-            ->where('cook_id', $id)
-            ->get();
+        $cook_meals = Meal::with('meal_images')->where('cook_id', $id)->get();
 
         if (!$cook_meals->isEmpty()) {
-            $data = [
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful',
                 'data' => $cook_meals,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'No records found',
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Create a new meal.
      */
     public function store(MealRequest $request)
     {
         $request->validated();
 
-        $cookId = $request->input('cook_id');
-        $meal_name = $request->input('meal_name');
-        $meal_price = $request->input('meal_price');
-        $min_qty = $request->input('min_qty');
-        $max_qty = $request->input('max_qty');
-        $meal_type = $request->input('meal_type');
-        $prep_time = $request->input('prep_time');
-        $meal_desc = $request->input('meal_desc');
-        $ingredients = $request->input('ingredients');
-        $serving_advice = $request->input('serving_advice');
-
-        $meal = Meal::create([
-            'cook_id' => $cookId,
-            'meal_name' => $meal_name,
-            'meal_price' => $meal_price,
-            'min_qty' => $min_qty,
-            'max_qty' => $max_qty,
-            'meal_type' => $meal_type,
-            'prep_time' => $prep_time,
-            'meal_desc' => $meal_type,
-            'ingredients' => $ingredients,
-            'serving_advice' => $serving_advice,
-            'booked_status' => 1,
-            'express_status' => 0,
-            'status' => 0,
-        ]);
+        $meal = Meal::create($request->all() + ['booked_status' => 1, 'express_status' => 0, 'status' => 0]);
 
         if ($meal) {
-            $data = [
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Meal created successfully.kindly proceed to upload required images',
+                'message' => 'Meal created successfully. Proceed to upload required images.',
                 'meal_id' => $meal->id,
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'An error occurred.Meal was NOT created. Please try again!',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'An error occurred. Meal was NOT created. Please try again!',
+        ]);
     }
 
     /**
-     * Upload meals images
+     * Upload meal images.
      */
     public function uploadImages(MealImageRequest $request)
     {
         $request->validated();
 
-        $images = $request->file('image_url');
         $meal_id = $request->input('meal_id');
         $savedImageUrls = [];
 
-        foreach ($images as $image) {
-            $img = Image::make($image->getRealPath());
+        foreach ($request->file('image_url') as $image) {
+            $filePath = $this->processImageUpload($image);
 
-            // Determine the image dimensions
-            $width = $img->width();
-            $height = $img->height();
-
-            // Check if the image needs to be resized
-            if ($width != 640 || $height != 480) {
-                // Resize the image to 640x480
-                $img->resize(882, 484);
-            }
-            $resizedImageData = $img->encode('png');
-            // Define a maximum file size (in bytes)
-            $maxFileSize = 5 * 1024 * 1024;  // 5MB (adjust as needed)
-
-            $uniqueFileName = time() . '_' . Str::random(10) . '.png';
-            $filePath = 'meals/' . $uniqueFileName;
-            $fileSize = strlen($resizedImageData);
-            // Convert the image to a binary string
-            $fileSizeInKB = $fileSize / 1024;  // Convert to kilobytes
-            $fileSizeInMB = $fileSizeInKB / 1024;  // Convert to megabytes
-
-            if ($fileSizeInMB >= 1) {
-                // If the file size is 1MB or more, display it in MB
-                $formattedFileSize = round($fileSizeInMB, 2) . ' MB';
+            if ($filePath) {
+                $savedImageUrls[] = $filePath;
+                MealImage::create(['meal_id' => $meal_id, 'image_url' => $filePath]);
             } else {
-                // Otherwise, display it in KB
-                $formattedFileSize = round($fileSizeInKB, 2) . ' KB';
-            }
-
-            // Upload the resized image to AWS S3
-            $uploaded = $this->uploadToS3($filePath, $resizedImageData);
-
-            if ($uploaded) {
-                $savedImageUrls[] = $this->getImageS3Url($filePath);
-            } else {
-                $data = [
+                return response()->json([
                     'status' => 'error',
-                    'message' => 'meal photos not uploaded.',
-                ];
-                return response()->json($data);
-            }
-        }
-
-        if (!empty($savedImageUrls)) {
-            // code...
-            foreach ($savedImageUrls as $imageUrl) {
-                MealImage::create([
-                    'meal_id' => $meal_id,
-                    'image_url' => $imageUrl,
+                    'message' => 'Meal images were not uploaded. Please try again!',
                 ]);
             }
-            $data = [
-                'status' => 'success',
-                'message' => 'Meal images uploaded successfully. Kindly await approval for the new meal you have created!',
-            ];
-        } else {
-            $data = [
-                'status' => 'error',
-                'message' => 'An error occurred. Meal images were NOT uploaded. Please try again!'
-            ];
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Meal images uploaded successfully. Kindly await approval for the new meal!',
+        ]);
+    }
+
+    /**
+     * Process image upload to S3 and return file path.
+     */
+    private function processImageUpload($image)
+    {
+        $img = Image::make($image->getRealPath())->resize(882, 484);
+        $resizedImageData = $img->encode('png');
+
+        $uniqueFileName = time() . '_' . Str::random(10) . '.png';
+        $filePath = 'meals/' . $uniqueFileName;
+
+        return $this->uploadToS3($filePath, $resizedImageData) ? $this->getImageS3Url($filePath) : false;
     }
 
     private function uploadToS3($filePath, $imageData)
@@ -353,84 +259,24 @@ class MealController extends Controller
     }
 
     /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        $meal = Meal::where('id', $id)->first();
-
-        if (!empty($meal)) {
-            $data = [
-                'status' => 'success',
-                'messages' => 'Request successful!',
-                'data' => $meal,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Meal record not found!',
-            ];
-        }
-        return response()->json($data);
-    }
-
-    /**
-     * Update the specified resource in storage.
+     * Update the specified meal.
      */
     public function update(MealUpdateRequest $request, string $id)
     {
-        $request->validate();
+        $meal = Meal::findOrFail($id);
+        $meal->fill($request->only(['meal_price', 'min_qty', 'max_qty']));
 
-        $meal_price = $request->input('meal_price');
-        $min_qty = $request->input('min_qty');
-        $max_qty = $request->input('max_qty');
-
-        $meal = Meal::where('id', $id)->first();
-
-        if (!empty($meal)) {
-            $meal->meal_price = $meal_price;
-            $meal->min_qty = $min_qty;
-            $meal->max_qty = $max_qty;
-
-            if ($meal->update()) {
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Meal updated successfully',
-                ];
-            } else {
-                $data = [
-                    'status' => 'error',
-                    'message' => 'An error occurred. Meal was NOT updated. Please try again!',
-                ];
-            }
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Meal record not found for update. Please try again!',
-            ];
-        }
-    }
-
-    /**
-     * Show the form full editing the specified resource.
-     */
-    public function mealFullEdit(string $id)
-    {
-        $meal = Meal::where('id', $id)->first();
-
-        if (!empty($meal)) {
-            $data = [
+        if ($meal->save()) {
+            return response()->json([
                 'status' => 'success',
-                'messages' => 'Request successful!',
-                'data' => $meal,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Meal record not found!',
-            ];
+                'message' => 'Meal updated successfully',
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'An error occurred. Meal was NOT updated. Please try again!',
+        ]);
     }
 
     /**
@@ -438,57 +284,19 @@ class MealController extends Controller
      */
     public function mealFullUpdate(FullMealUpdateRequest $request, string $id)
     {
-        $request->validated();
-        //  return $request;
-        $meal_name = $request->input('meal_name');
-        $meal_price = $request->input('meal_price');
-        $min_qty = $request->input('min_qty');
-        $max_qty = $request->input('max_qty');
-        $meal_type = $request->input('meal_type');
-        $prep_time = $request->input('prep_time');
-        $meal_desc = $request->input('meal_desc');
-        $ingredients = $request->input('ingredients');
-        $serving_advice = $request->input('serving_advice');
+        $meal = Meal::findOrFail($id);
+        $meal->fill($request->all() + ['status' => 0]);
 
-        $meal = Meal::where('id', $id)->first();
-
-        if (!empty($meal)) {
-            $meal->meal_name = $meal_name;
-            $meal->meal_price = $meal_price;
-            $meal->min_qty = $min_qty;
-            $meal->max_qty = $max_qty;
-            $meal->meal_type = $meal_type;
-            $meal->prep_time = $prep_time;
-            $meal->meal_desc = $meal_type;
-            $meal->ingredients = $ingredients;
-            $meal->serving_advice = $serving_advice;
-            $meal->status = 0;
-
-            if ($meal->update()) {
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Meal updated successfully. Kindly await approval for the changes you have done!',
-                ];
-            } else {
-                $data = [
-                    'status' => 'error',
-                    'message' => 'AN error occurred. Meal was NOT updated. Please try again!',
-                ];
-            }
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Meal record not found for update. Please try again!',
-            ];
+        if ($meal->save()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Meal updated successfully. Kindly await approval for the changes!',
+            ]);
         }
-        return response()->json($data);
-    }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'status' => 'error',
+            'message' => 'An error occurred. Meal was NOT updated. Please try again!',
+        ]);
     }
 }

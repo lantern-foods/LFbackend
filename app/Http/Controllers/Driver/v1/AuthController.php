@@ -13,35 +13,28 @@ class AuthController extends Controller
      */
     public function authenticate(Request $request)
     {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+        ]);
+
         $email = $request->input('email');
         $password = $request->input('password');
-        // Assuming these are passed in the request
         $latitude = $request->input('latitude');
         $longitude = $request->input('longitude');
 
-        if (empty($email)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Email is required!',
-            ]);
-        } elseif (empty($password)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Password is required!',
-            ]);
-        }
-
         if (Auth::guard('drivers')->attempt(['email' => $email, 'password' => $password])) {
-            $user = auth('drivers')->user();
+            $user = Auth::guard('drivers')->user();
 
-            // Update login status and location
-            $loginLocation = $latitude . ',' . $longitude; // Format as needed
+            // Update driver's login status and location
             $user->update([
-                'login_status' => 1, // Assuming you want to set this status
-                'login_location' => $loginLocation,
+                'login_status' => 1, // Assuming '1' indicates the driver is online
+                'login_location' => "{$latitude},{$longitude}", // Format location as "latitude,longitude"
             ]);
 
-            $token = $user->createToken('driver Token')->accessToken;
+            $token = $user->createToken('Driver Token')->accessToken;
 
             return response()->json([
                 'status' => 'success',
@@ -53,22 +46,21 @@ class AuthController extends Controller
             return response()->json([
                 'status' => 'Unauthorized',
                 'status_code' => 401,
-            ]);
+                'message' => 'Invalid email or password',
+            ], 401);
         }
     }
 
     /**
-     * Logout
+     * Logout the driver
      */
     public function logout(Request $request)
     {
         $request->user()->token()->revoke();
 
-        $response = [
+        return response()->json([
             'status' => 'success',
             'message' => 'Logged out successfully',
-        ];
-
-        return response()->json($response);
+        ]);
     }
 }

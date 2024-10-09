@@ -4,92 +4,105 @@ namespace App\Http\Controllers\Cook\v1;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Auth;
-use DB;
+use Illuminate\Support\Facades\DB;
 
 class CookOrdersController extends Controller
 {
-    public function pending_orders(string $id)
+    /**
+     * Get all pending orders for a specific cook.
+     */
+    public function pending_orders(string $cookId)
     {
-        $pending_orders = DB::table('orders')
-            ->join('order_details', 'order_details.order_id', '=', 'orders.id')
-            ->join('meals', 'order_details.meal_id', '=', 'meals.id')
-            ->join('cooks', 'meals.cook_id', '=', 'cooks.id')
-            ->where('cooks.id', $id)
-            ->select('orders.*')
-            ->where('orders.status', 'Successful Payment')
-            ->get();
+        $pending_orders = $this->fetchOrdersByCookAndStatus($cookId, 'Successful Payment');
 
-        if (!empty($pending_orders)) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $pending_orders,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records!',
-            ];
-        }
-
-        return response()->json($data);
+        return $this->generateResponse($pending_orders, 'Pending Orders');
     }
 
-    public function order_ready(string $id)
+    /**
+     * Mark a specific order as 'Ready for Pickup'.
+     */
+    public function order_ready(string $orderId)
     {
-        $pending_order = DB::table('orders')
-            ->join('order_details', 'order_details.order_id', '=', 'orders.id')
-            ->join('meals', 'order_details.meal_id', '=', 'meals.id')
-            ->join('cooks', 'meals.cook_id', '=', 'cooks.id')
-            ->where('orders.id', $id)
-            ->where('orders.status', 'Successful Payment')
-            ->first();
+        $order = $this->fetchOrderByIdAndStatus($orderId, 'Successful Payment');
 
-        if (!empty($pending_order)) {
-            $pending->status = 'Ready for Pickup';
+        if ($order) {
+            $updated = DB::table('orders')
+                ->where('id', $orderId)
+                ->update(['status' => 'Ready for Pickup']);
 
-            if ($pending_order->update()) {
-                $data = [
+            if ($updated) {
+                return response()->json([
                     'status' => 'success',
-                    'message' => 'order ready for pick updated successfully',
-                ];
-            } else {
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered, your order was NOT updated. Please try again!'
-                ];
+                    'message' => 'Order status updated to Ready for Pickup',
+                ]);
             }
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to locate your order for update. Please try again!'
-            ];
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update order status. Please try again!',
+            ], 500);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Order not found or not eligible for status update',
+        ], 404);
     }
 
-    public function orders_ready(string $id)
+    /**
+     * Get details of a specific order that is marked as 'Successful Payment'.
+     */
+    public function orders_ready(string $orderId)
     {
-        $single_order = DB::table('orders')
+        $order = $this->fetchOrderByIdAndStatus($orderId, 'Successful Payment');
+
+        return $this->generateResponse($order, 'Order Details');
+    }
+
+    /**
+     * Helper method to fetch orders for a cook based on status.
+     */
+    private function fetchOrdersByCookAndStatus(string $cookId, string $status)
+    {
+        return DB::table('orders')
             ->join('order_details', 'order_details.order_id', '=', 'orders.id')
             ->join('meals', 'order_details.meal_id', '=', 'meals.id')
-            ->where('orders.id', $id)
-            ->where('orders.status', 'Successful Payment')
+            ->join('cooks', 'meals.cook_id', '=', 'cooks.id')
+            ->where('cooks.id', $cookId)
+            ->where('orders.status', $status)
+            ->select('orders.*')
             ->get();
+    }
 
-        if (!empty($single_order)) {
-            $data = [
+    /**
+     * Helper method to fetch a specific order by its ID and status.
+     */
+    private function fetchOrderByIdAndStatus(string $orderId, string $status)
+    {
+        return DB::table('orders')
+            ->join('order_details', 'order_details.order_id', '=', 'orders.id')
+            ->join('meals', 'order_details.meal_id', '=', 'meals.id')
+            ->where('orders.id', $orderId)
+            ->where('orders.status', $status)
+            ->first();
+    }
+
+    /**
+     * Helper method for generating consistent responses.
+     */
+    private function generateResponse($data, string $entityName)
+    {
+        if ($data && !$data->isEmpty()) {
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Request successfully',
-                'data' => $single_order
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to locate your order for update. Please try again!'
-            ];
+                'message' => "$entityName retrieved successfully",
+                'data' => $data,
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => "No $entityName found",
+        ], 404);
     }
 }

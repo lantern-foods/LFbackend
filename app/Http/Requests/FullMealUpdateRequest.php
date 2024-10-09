@@ -34,21 +34,20 @@ class FullMealUpdateRequest extends FormRequest
         ];
     }
 
-    /*
-     *
-     * Rules messages 
+    /**
+     * Custom messages for validation rules.
      */
-    public function messages():array
+    public function messages(): array
     {
         return [
             'meal_name.required' => 'Meal\'s name is required!',
             'meal_price.required' => 'Meal\'s price is required!',
             'min_qty.required' => 'Meal\'s minimum quantity for order is required!',
             'max_qty.required' => 'Meal\'s maximum quantity for order is required!',
-            'meal_type.required' => 'Meal\'s meal type is required!',
-            'prep_time.required' => 'Meals\'s prep time is required!',
+            'meal_type.required' => 'Meal\'s type is required!',
+            'prep_time.required' => 'Meal\'s preparation time is required!',
             'meal_desc.required' => 'Meal\'s description is required!',
-            'ingredients.required' => 'Meal\'s ingredients is required!',
+            'ingredients.required' => 'Meal\'s ingredients are required!',
             'serving_advice.required' => 'Meal\'s serving advice is required!',
         ];
     }

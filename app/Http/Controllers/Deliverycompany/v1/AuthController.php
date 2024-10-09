@@ -52,14 +52,14 @@ class AuthController extends Controller
                 'status'=>'Unauthorized',
                 'status_code'=>401
             ];
-            
+
         }
 
         return response()->json($response);
     }
 
     /**
-     * Logout 
+     * Logout
      */
     public function logout(Request $request)
     {

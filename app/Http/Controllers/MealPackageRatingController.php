@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\MealPackageRating;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -14,33 +13,18 @@ class MealPackageRatingController extends Controller
      */
     public function index()
     {
-  $ratedMeals = MealPackageRating::
+        $ratedMeals = MealPackageRating::whereNotNull('meal_id')
+            ->with('meal', 'user')
+            ->get();
 
-      whereNotNull('meal_id')
-      ->
-      with('meal')
-      ->with('user')
+        $ratedPackages = MealPackageRating::whereNotNull('package_id')
+            ->with('mealPackage', 'user')
+            ->get();
 
-      ->get();
-  $ratedPackages = MealPackageRating::
-
-      whereNotNull('package_id')
-      ->
-      with('mealPackage')
-      ->with('user')
-
-      ->get();
-  return response()->json(['ratedMeals' => $ratedMeals, 'ratedPackages' => $ratedPackages]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-
-
+        return response()->json([
+            'ratedMeals' => $ratedMeals,
+            'ratedPackages' => $ratedPackages,
+        ]);
     }
 
     /**
@@ -48,30 +32,37 @@ class MealPackageRatingController extends Controller
      */
     public function store(Request $request)
     {
-        if($request->package_id==null && !isset($request->meal_id)){
-                   return  response()->json(['message' => 'Please provide an item to rate'], 400);
-                }
-                if($request->package_id!=null && isset($request->meal_id)){
-                    return  response()->json(['message' => 'Please provide an item to rate'], 400);
-                }
-                if($request->package_id!=null && !isset($request->meal_id)){
-                    $mealPackageRating = MealPackageRating::where('package_id', $request->package_id)
-                        ->where('user_id', Auth::id())
-                        ->first();
-                    if ($mealPackageRating) {
-                        return response()->json(['message' => 'You have already rated this package'], 400);
-                    }
-                }
-                if(isset($request->meal_id) && !isset($request->package_id)){
-                    $mealPackageRating = MealPackageRating::where('meal_id', $request->meal_id)
-                        ->where('user_id', Auth::id())
-                        ->first();
-                    if ($mealPackageRating) {
-                        return response()->json(['message' => 'You have already rated this meal'], 400);
-                    }
-                }
+        // Validate that either meal_id or package_id is provided, but not both.
+        if (is_null($request->package_id) && !isset($request->meal_id)) {
+            return response()->json(['message' => 'Please provide an item to rate'], 400);
+        }
+
+        if (!is_null($request->package_id) && isset($request->meal_id)) {
+            return response()->json(['message' => 'Please provide either a meal or package to rate, not both'], 400);
+        }
+
+        // Check if user has already rated the item (meal or package).
+        if (!is_null($request->package_id)) {
+            $existingRating = MealPackageRating::where('package_id', $request->package_id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if ($existingRating) {
+                return response()->json(['message' => 'You have already rated this package'], 400);
+            }
+        }
+
+        if (isset($request->meal_id) && is_null($request->package_id)) {
+            $existingRating = MealPackageRating::where('meal_id', $request->meal_id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if ($existingRating) {
+                return response()->json(['message' => 'You have already rated this meal'], 400);
+            }
+        }
+
         // Create a new MealPackageRating
-        // Validate the request data
         $mealPackageRating = new MealPackageRating();
         $mealPackageRating->user_id = Auth::id();
         $mealPackageRating->meal_id = $request->meal_id;
@@ -81,37 +72,43 @@ class MealPackageRatingController extends Controller
         $mealPackageRating->service = $request->service;
         $mealPackageRating->review = $request->review;
         $mealPackageRating->save();
-        return response()->json(['message' => 'MealPackageRating created successfully', 'mealPackageRating' => $mealPackageRating], 201); // 201 Created
+
+        return response()->json([
+            'message' => 'MealPackageRating created successfully',
+            'mealPackageRating' => $mealPackageRating,
+        ], 201);
     }
 
     /**
-     * Display the specified resource.
+     * Display the ratings for a specific meal.
      */
-    public function showMealRatings(Request $request,$meal_id)
+    public function showMealRatings($meal_id)
     {
-        //
-
         $mealPackageRating = MealPackageRating::where('meal_id', $meal_id)
             ->join('clients', 'clients.id', '=', 'meal_package_ratings.user_id')
             ->select('meal_package_ratings.*', 'clients.full_name')
-            ->orderBy('meal_package_ratings.created_at', 'desc') // Order by created_at in descending order
+            ->orderBy('meal_package_ratings.created_at', 'desc')
             ->get();
 
         return response()->json([
-
-            'meal_ratings' => $mealPackageRating], 200);
-
+            'meal_ratings' => $mealPackageRating
+        ], 200);
     }
-    public function showPackageRatings(Request $request, $package_id)
+
+    /**
+     * Display the ratings for a specific package.
+     */
+    public function showPackageRatings($package_id)
     {
-        //
         $mealPackageRating = MealPackageRating::where('package_id', $package_id)
             ->join('clients', 'clients.id', '=', 'meal_package_ratings.user_id')
             ->select('meal_package_ratings.*', 'clients.full_name')
-            ->orderBy('meal_package_ratings.created_at', 'desc') // Order by created_at in descending order
+            ->orderBy('meal_package_ratings.created_at', 'desc')
             ->get();
-        return response()->json(['package_ratings' => $mealPackageRating], 200);
 
+        return response()->json([
+            'package_ratings' => $mealPackageRating
+        ], 200);
     }
 
     /**
@@ -119,7 +116,7 @@ class MealPackageRatingController extends Controller
      */
     public function edit(MealPackageRating $mealPackageRating)
     {
-        //
+        // Method for showing the form for editing a specific resource.
     }
 
     /**
@@ -127,7 +124,7 @@ class MealPackageRatingController extends Controller
      */
     public function update(Request $request, MealPackageRating $mealPackageRating)
     {
-        //
+        // Method for updating a specific resource.
     }
 
     /**
@@ -135,6 +132,6 @@ class MealPackageRatingController extends Controller
      */
     public function destroy(MealPackageRating $mealPackageRating)
     {
-        //
+        // Method for deleting a specific resource.
     }
 }

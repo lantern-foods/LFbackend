@@ -22,16 +22,16 @@ class ShiftRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'cook_id' => 'required',
-            'estimated_revenue' => 'required',
-            'start_time' => 'required',
-            'end_time' => 'required',
-            'shift_date' => 'required',
+            'cook_id' => 'required|integer|exists:cooks,id',
+            'estimated_revenue' => 'required|numeric|min:0',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'shift_date' => 'required|date',
         ];
     }
 
     /**
-     * Get custom messages for validator errors.
+     * Custom error messages for validator rules.
      *
      * @return array
      */
@@ -39,10 +39,18 @@ class ShiftRequest extends FormRequest
     {
         return [
             'cook_id.required' => 'A cook ID is required.',
+            'cook_id.integer' => 'Cook ID must be an integer.',
+            'cook_id.exists' => 'The selected cook does not exist.',
             'estimated_revenue.required' => 'Estimated revenue is required.',
+            'estimated_revenue.numeric' => 'Estimated revenue must be a numeric value.',
+            'estimated_revenue.min' => 'Estimated revenue cannot be less than 0.',
             'start_time.required' => 'A start time is required.',
+            'start_time.date_format' => 'Start time must be in the format HH:mm.',
             'end_time.required' => 'An end time is required.',
-            'shift_date.required' => 'A date is required.',
+            'end_time.date_format' => 'End time must be in the format HH:mm.',
+            'end_time.after' => 'End time must be after the start time.',
+            'shift_date.required' => 'A shift date is required.',
+            'shift_date.date' => 'Shift date must be a valid date.',
         ];
     }
 }

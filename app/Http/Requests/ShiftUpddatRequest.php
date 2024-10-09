@@ -22,18 +22,24 @@ class ShiftUpddatRequest extends FormRequest
     public function rules(): array
     {
         return [
-
-
-            'end_time' => 'required',
-            'shift_date' => 'required',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'shift_date' => 'required|date',
         ];
     }
+
+    /**
+     * Custom error messages for validator rules.
+     *
+     * @return array
+     */
     public function messages(): array
     {
         return [
-
             'end_time.required' => 'An end time is required.',
+            'end_time.date_format' => 'End time must be in the format HH:mm.',
+            'end_time.after' => 'End time must be after the start time.',
             'shift_date.required' => 'A date is required.',
+            'shift_date.date' => 'The shift date must be a valid date.',
         ];
     }
 }

@@ -22,22 +22,24 @@ class PackageEditRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'package_name' => 'required',
-            'package_description' => 'required',
-            'discount' => 'required',
+            'package_name' => 'required|string|max:255',
+            'package_description' => 'required|string|max:1000',
+            'discount' => 'required|numeric|min:0|max:100',
         ];
     }
 
-     /**
-     * Rules messages
+    /**
+     * Custom messages for validation rules.
      */
     public function messages(): array
     {
         return [
-            'package_name.required' => 'meal\'s Package name is required',
-            'package_description.required' => 'meal\'s Package description is required',
-            'discount.required' => 'meal\'s Package discount is required',
+            'package_name.required' => 'Package name is required.',
+            'package_description.required' => 'Package description is required.',
+            'discount.required' => 'Package discount is required.',
+            'discount.numeric' => 'Package discount must be a numeric value.',
+            'discount.min' => 'Discount cannot be negative.',
+            'discount.max' => 'Discount cannot exceed 100%.',
         ];
-        
     }
 }

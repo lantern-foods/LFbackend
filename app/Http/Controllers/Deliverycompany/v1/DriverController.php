@@ -18,169 +18,126 @@ class DriverController extends Controller
     use Drivers;
 
     /**
-     * Display a listing of the resource.
+     * Display a listing of all drivers.
      */
     public function index()
     {
-        $allocated_drivers = Driver::with('vehicle')->get();
-
+        $allocatedDrivers = Driver::with('vehicle')->get();
         $driversWithoutVehicles = Driver::doesntHave('vehicle')->get();
 
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => [$allocated_drivers, $driversWithoutVehicles],
-            ];
-
-
-           
-
-        return response()->json($data);
-
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Request successful',
+            'data' => [
+                'allocated_drivers' => $allocatedDrivers,
+                'drivers_without_vehicles' => $driversWithoutVehicles
+            ],
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created driver.
      */
     public function store(DriverRequest $request)
     {
         $request->validated();
 
-        $company_id = $request->input('company_id');
-        $email = $request->input('email');
-        $driver_name = $request->input('driver_name');
-        $phone_number = $request->input('phone_number');
-        $id_number = $request->input('id_number');
-        $date_of_birth = $request->input('date_of_birth');
-        $gender = $request->input('gender');
-
         $driver = Driver::create([
-            'company_id' => $company_id,
-            'email' => $email,
-            'driver_name' => $driver_name,
-            'phone_number' => $phone_number,
-            'id_number' => $id_number,
-            'date_of_birth' => $date_of_birth,
-            'gender' => $gender,
+            'company_id' => $request->input('company_id'),
+            'email' => $request->input('email'),
+            'driver_name' => $request->input('driver_name'),
+            'phone_number' => $request->input('phone_number'),
+            'id_number' => $request->input('id_number'),
+            'date_of_birth' => $request->input('date_of_birth'),
+            'gender' => $request->input('gender'),
         ]);
 
         if ($driver) {
-
-            $data = [
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Driver creeated successfully. Kindly proceed to upload required documents!',
+                'message' => 'Driver created successfully. Proceed to upload required documents!',
                 'driverId' => $driver->id,
-            ];
-        } else {
-
-            $data = [
-                'status' => 'error',
-                'message' => 'A problem was encountered, Driver was NOT created. Please try again!',
-            ];
+            ]);
         }
-        return response()->json($data);
 
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered. Driver was NOT created. Please try again!',
+        ]);
     }
 
-    /***
-     * Upload Images Documents
+    /**
+     * Upload driver documents.
      */
-    public function UploadImages(DriverImageRequest $request)
+    public function uploadImages(DriverImageRequest $request)
     {
         $request->validated();
-
         $driverId = $request->input('driverId');
-        $idFront = $request->file('id_front');
-        $idBack = $request->file('id_back');
-        $profilePic = $request->file('profile_pic');
 
-        // Upload id_front image to S3
-        $idFrontPath = $this->uploadToS3($idFront, 'id_front', $driverId);
+        $idFrontPath = $this->uploadToS3($request->file('id_front'), 'id_front', $driverId);
+        $idBackPath = $this->uploadToS3($request->file('id_back'), 'id_back', $driverId);
+        $profilePicPath = $this->uploadToS3($request->file('profile_pic'), 'profile_pic', $driverId);
 
-        // Upload id_back image to S3
-        $idBackPath = $this->uploadToS3($idBack, 'id_back', $driverId);
-
-        // Upload profile_pic image to S3
-        $profilePicPath = $this->uploadToS3($profilePic, 'profile_pic', $driverId);
-
-        // Upload health_cert to S3
-
-        // Check if all file paths have values
-        if (empty($idFrontPath) || empty($idBackPath) || empty($profilePicPath)) {
-
-            $data = [
+        if (!$idFrontPath || !$idBackPath || !$profilePicPath) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'Oops! A problem was encountered,the documents were not uploaded. Please try again or contact Support.',
-            ];
-
-        } else {
-            // Save paths to database using create
-            $driverdocument = DriverDocument::create([
-                'driver_id' => $driverId,
-                'id_front' => $idFrontPath,
-                'id_back' => $idBackPath,
-                'profile_pic' => $profilePicPath,
+                'message' => 'Documents were not uploaded. Please try again or contact support!',
             ]);
-
-            if ($driverdocument) {
-                $driver = Driver::where('id', $driverId)->first();
-                // Dispatch the SendOtpJob to send OTP asynchronously
-                $this->sendDriverOtp($driver);
-                $data = [
-                    'status' => 'success',
-                    'message' => 'All documents uploaded successfully!',
-                ];
-            }else {
-
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered, account was NOT created. Please try again!',
-                ];
-    
-            }
-
         }
-        return response()->json($data);
 
+        $driverDocument = DriverDocument::create([
+            'driver_id' => $driverId,
+            'id_front' => $idFrontPath,
+            'id_back' => $idBackPath,
+            'profile_pic' => $profilePicPath,
+        ]);
+
+        if ($driverDocument) {
+            $driver = Driver::find($driverId);
+            $this->sendDriverOtp($driver);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Documents uploaded successfully!',
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered. Please try again!',
+        ]);
     }
 
+    /**
+     * Send OTP to the driver.
+     */
     public function sendDriverOtp(Driver $driver)
     {
-
-        // Generate a random 6-digit OTP
         $otp = mt_rand(100000, 999999);
-
-        // Save the OTP to the client record in the database
         $driver->update(['drive_otp' => $otp]);
 
         dispatch(new SendDriverOtp($driver));
 
-        $data = [
+        return response()->json([
             'status' => 'success',
             'message' => 'OTP sent successfully',
-        ];
-        return response()->json($data);
+        ]);
     }
 
+    /**
+     * Upload files to S3.
+     */
     private function uploadToS3($file, $prefix, $driverId)
     {
         $filename = $prefix . '_' . $driverId . '_' . time() . '.' . $file->getClientOriginalExtension();
 
-        // Check if the file is an image
         if (in_array($file->getClientOriginalExtension(), ['jpg', 'jpeg', 'png'])) {
             $image = Image::make($file)->resize(300, 200);
             $fileContents = (string) $image->encode();
         } else {
-            // If it's a PDF, store it as a PDF
-            if ($file->getClientOriginalExtension() == 'pdf') {
-                $fileContents = file_get_contents($file);
-            } else {
-                // For other file types (non-image, non-PDF), treat as binary content
-                $fileContents = file_get_contents($file);
-            }
+            $fileContents = file_get_contents($file);
         }
 
-        // Upload to S3
         $path = "drivers/{$driverId}/{$filename}";
         Storage::disk('s3')->put($path, $fileContents, 'public');
 
@@ -188,102 +145,64 @@ class DriverController extends Controller
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Show a specific driver's details.
      */
     public function edit(string $id)
     {
-        $driver = Driver::where('id', $id)->first();
+        $driver = Driver::find($id);
 
-        if (!empty($driver)) {
-
-            $data = [
+        if ($driver) {
+            return response()->json([
                 'status' => 'success',
-                'message' => 'Request successful!',
+                'message' => 'Request successful',
                 'data' => $driver,
-            ];
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load driver profile. Please try again!',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Unable to load driver profile. Please try again!',
+        ]);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update a driver's details.
      */
     public function update(UpdateDriverRequest $request, string $id)
     {
         $request->validated();
+        $driver = Driver::find($id);
 
-        $driver_name = $request->input('driver_name');
-        $email = $request->input('email');
-        $phone_number = $request->input('phone_number');
-        $id_number = $request->input('id_number');
-        $date_of_birth = $request->input('date_of_birth');
-        $gender = $request->input('gender');
-
-        if ($this->emailAddressExists($email) && !$this->emailBelongsToDriver($id, $email)) {
-
-            $data = [
-                'status' => 'error',
-                'message' => 'Email address is already in use by another driver!',
-
-            ];
-            return response()->json($data);
-        } elseif ($this->phonenoExists($phone_number) && !$this->phoneBelongsToDriver($id, $phone_number)) {
-
-            $data = [
-                'status' => 'error',
-                'message' => 'Phone number is already in use by another driver',
-            ];
-            return response()->json($data);
-        } elseif ($this->idnumberExists($id_number) && !$this->idnumberBelongsToDriver($id, $id_number)) {
-
-            $data = [
-                'status' => 'error',
-                'message' => 'Id number is already in use by another driver',
-            ];
-
-            return response()->json($data);
+        if (!$driver) {
+            return response()->json([
+                'status' => 'no_data',
+                'message' => 'Driver not found. Please try again!',
+            ]);
         }
 
-        $driver = Driver::where('id', $id)->first();
-
-        if (!empty($driver)) {
-
-            $driver->driver_name = $driver_name;
-            $driver->id_number = $id_number;
-            $driver->phone_number = $phone_number;
-            $driver->email = $email;
-            $driver->gender = $gender;
-            $driver->date_of_birth = $date_of_birth;
-
-            if ($driver->update()) {
-
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Driver updated successfully',
-                ];
-            } else {
-
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered. Driver was NOT updated. Please try again',
-                ];
-            }
-            return response()->json($data);
+        if (
+            $this->emailAddressExists($request->input('email')) && !$this->emailBelongsToDriver($id, $request->input('email')) ||
+            $this->phonenoExists($request->input('phone_number')) && !$this->phoneBelongsToDriver($id, $request->input('phone_number')) ||
+            $this->idnumberExists($request->input('id_number')) && !$this->idnumberBelongsToDriver($id, $request->input('id_number'))
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Email, phone number, or ID number is already in use by another driver!',
+            ]);
         }
-    }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
+        $driver->update([
+            'driver_name' => $request->input('driver_name'),
+            'id_number' => $request->input('id_number'),
+            'phone_number' => $request->input('phone_number'),
+            'email' => $request->input('email'),
+            'gender' => $request->input('gender'),
+            'date_of_birth' => $request->input('date_of_birth'),
+        ]);
 
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Driver updated successfully',
+        ]);
+    }
 }

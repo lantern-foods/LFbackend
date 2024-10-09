@@ -10,7 +10,6 @@ use App\Models\Cook;
 use App\Models\CookDocument;
 use App\Traits\Clients;
 use App\Traits\Cooks;
-
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -18,11 +17,10 @@ use Intervention\Image\ImageManagerStatic as Image;
 
 class CookController extends Controller
 {
-    use Cooks;
-    use Clients;
+    use Cooks, Clients;
 
     /**
-     * Display a listing of the resource.
+     * Display a listing of all cooks with their shifts.
      */
     public function index()
     {
@@ -31,8 +29,8 @@ class CookController extends Controller
         if ($cooks->isEmpty()) {
             return response()->json([
                 'status' => 'no_data',
-                'message' => 'No records',
-            ]);
+                'message' => 'No records found',
+            ], 404);
         }
 
         return response()->json([
@@ -40,101 +38,59 @@ class CookController extends Controller
             'message' => 'Request successful',
             'data' => $cooks,
         ]);
-
-
-    }
-
-    public function all_cook_meals()
-    {
-        $client_id = Auth::user()->id;
-
-        $allcook_meals = Cook::with('meals.meal_images')
-            // ->where('express_status', 1)
-            ->get();
-
-        if (!$allcook_meals->isEmpty()) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $allcook_meals,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
-        }
-        return response()->json($data);
-    }
-
-    public function all_cook_meals_express()
-    {
-        {
-            $allcook_meals = Cook::with('meals.meal_images')
-                // where shift id not null
-                // ->where('express_status', 1)
-                ->get();
-
-            if (!$allcook_meals->isEmpty()) {
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Request successful',
-                    'data' => $allcook_meals,
-                ];
-            } else {
-                $data = [
-                    'status' => 'no_data',
-                    'message' => 'No records',
-                ];
-            }
-            return response()->json($data);
-        }
-    }
-
-    public function all_cook_meal(string $id)
-    {
-        $allcook_meal = Cook::with(['shifts', 'meals.meal_images'])->where('id', $id)->get();
-
-        if (!$allcook_meal->isEmpty()) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => $allcook_meal,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'No records',
-            ];
-        }
-        return response()->json($data);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Get all meals from cooks.
+     */
+    public function all_cook_meals()
+    {
+        $allcook_meals = Cook::with('meals.meal_images')->get();
+
+        return $this->generateResponse($allcook_meals, 'Meals');
+    }
+
+    /**
+     * Get all express meals from cooks.
+     */
+    public function all_cook_meals_express()
+    {
+        $allcook_meals = Cook::with('meals.meal_images')->get();
+
+        return $this->generateResponse($allcook_meals, 'Express Meals');
+    }
+
+    /**
+     * Get details of a specific cook's meals and shifts.
+     */
+    public function all_cook_meal(string $id)
+    {
+        $allcook_meal = Cook::with(['shifts', 'meals.meal_images'])->find($id);
+
+        return $this->generateResponse($allcook_meal, 'Cook Meals');
+    }
+
+    /**
+     * Create a new cook.
      */
     public function store(CookRequest $request)
     {
         $validated = $request->validated();
 
-        $clientId = $validated['client_id'];
-        $kitchenName = $validated['kitchen_name'];
-
-        if (Cook::where('client_id', $clientId)->exists()) {
+        if (Cook::where('client_id', $validated['client_id'])->exists()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Sorry, you already exist as a cook',
-            ]);
+                'message' => 'You already exist as a cook.',
+            ], 400);
         }
-        $phone_number = $validated['mpesa_number'];
 
-        list($msisdn, $network) = $this->get_msisdn_network($phone_number);
+        list($msisdn, $network) = $this->get_msisdn_network($validated['mpesa_number']);
 
         $cook = Cook::create([
-            'client_id' => $clientId,
-            'kitchen_name' => $kitchenName,
+            'client_id' => $validated['client_id'],
+            'kitchen_name' => $validated['kitchen_name'],
             'id_number' => $validated['id_number'],
-            'mpesa_number' => $phone_number,
+            'mpesa_number' => $msisdn,
             'alt_phone_number' => $validated['alt_phone_number'],
             'health_number' => $validated['health_number'],
             'health_expiry_date' => $validated['health_expiry_date'],
@@ -147,216 +103,164 @@ class CookController extends Controller
         if (!$cook) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to create account. Please try again',
-            ]);
+                'message' => 'Failed to create account. Please try again.',
+            ], 500);
         }
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Account created successfully. Proceed to upload required documents',
+            'message' => 'Account created successfully. Proceed to upload required documents.',
             'clientID' => $cook->id,
-        ]);
+        ], 201);
     }
 
     /**
-     * Upload images/Documents.
+     * Upload documents for a cook.
      */
     public function uploadDocuments(CookDocumentRequest $request)
     {
         $validated = $request->validated();
 
-        $cookId = $validated['cook_id'];
         $idFront = $request->file('id_front');
         $idBack = $request->file('id_back');
         $healthCert = $request->file('health_cert');
         $profilePic = $request->file('profile_pic');
 
-        // Ensure all files are provided
         if (!$idFront || !$idBack || !$healthCert || !$profilePic) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'All required files must be provided',
-            ]);
+                'message' => 'All required files must be provided.',
+            ], 400);
         }
 
         try {
-            $idFrontPath = $this->uploadToS3($idFront, 'id_front', $cookId);
-            $idBackPath = $this->uploadToS3($idBack, 'id_back', $cookId);
-            $healthCertPath = $this->uploadToS3($healthCert, 'health_cert', $cookId);
-            $profilePicPath = $this->uploadToS3($profilePic, 'profile_pic', $cookId);
+            $documentData = [
+                'cook_id' => $validated['cook_id'],
+                'id_front' => $this->uploadToS3($idFront, 'id_front', $validated['cook_id']),
+                'id_back' => $this->uploadToS3($idBack, 'id_back', $validated['cook_id']),
+                'health_cert' => $this->uploadToS3($healthCert, 'health_cert', $validated['cook_id']),
+                'profile_pic' => $this->uploadToS3($profilePic, 'profile_pic', $validated['cook_id']),
+            ];
 
-            // Save paths to database
-            CookDocument::create([
-                'cook_id' => $cookId,
-                'id_front' => $idFrontPath,
-                'id_back' => $idBackPath,
-                'profile_pic' => $profilePicPath,
-                'health_cert' => $healthCertPath,
-            ]);
+            CookDocument::create($documentData);
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'All documents uploaded successfully!',
-            ]);
+                'message' => 'Documents uploaded successfully.',
+            ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to upload documents: ' . $e->getMessage(),
-            ]);
+            ], 500);
         }
-    }
-
-    private function uploadToS3($file, $prefix, $cookId)
-    {
-        $filename = $prefix . '_' . $cookId . '_' . time() . '.' . $file->getClientOriginalExtension();
-
-        // Check if the file is an image
-        if (in_array($file->getClientOriginalExtension(), ['jpg', 'jpeg', 'png'])) {
-            $image = Image::make($file)->resize(300, 200);
-            $fileContents = (string) $image->encode();
-        } else {
-            // Treat as binary content for other file types
-            $fileContents = file_get_contents($file);
-        }
-
-        // Upload to S3
-
-        $path = "cooks/{$cookId}/{$filename}";
-        Storage::disk('s3')->put($path, $fileContents, 'public');
-
-        return Storage::disk('s3')->url($path);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Edit a cook's profile.
      */
     public function edit(string $id)
     {
-        $cook = Cook::with('shifts')->where('id', $id)->first();
+        $cook = Cook::with('shifts')->find($id);
 
-        if (!empty($cook)) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => $cook,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load your profile. Please try again!'
-            ];
-        }
-        return response()->json($data);
+        return $this->generateResponse($cook, 'Cook Profile');
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update a cook's profile.
      */
     public function update(CookProfileEditRequest $request, string $id)
     {
         $request->validated();
 
-        $kitchen_name = $request->input('kitchen_name');
-        $mpesa_number = $request->input('mpesa_number');
-        $physical_address = $request->input('physical_address');
-        $google_map_pin = $request->input('google_map_pin');
+        $cook = Cook::find($id);
 
-        if ($this->kitchenNameExists($kitchen_name) && !$this->kitchennameBelongsToCook($id, $kitchen_name)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Kitchen name is already in use by another cook!',
-            ];
-            return response()->json($data);
-        } elseif ($this->mpesanoExists($mpesa_number) && !$this->mpesanoBelongsToCook($id, $mpesa_number)) {
-            $data = [
-                'status' => 'error',
-                'message' => 'Mpesa number is already in use by another cook!'
-            ];
-            return response()->json($data);
-        }
-
-        $cook = Cook::where('id', $id)->first();
-
-        if (!empty($cook)) {
-            $cook->kitchen_name = $kitchen_name;
-            $cook->mpesa_number = $mpesa_number;
-            $cook->physical_address = $physical_address;
-            $cook->google_map_pin = $google_map_pin;
-
-            if ($cook->update()) {
-                $data = [
-                    'status' => 'success',
-                    'message' => 'Profile updated successfully',
-                ];
-            } else {
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered, your profile was NOT updated. Please try again!'
-                ];
-            }
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to locate your profile for update. Please try again!'
-            ];
-        }
-        return response()->json($data);
-    }
-
-    public function profile(string $id)
-    {
-        $profile_cook = Cook::where('client_id', $id)->first();
-        //        cook profile picture
-        if (empty($profile_cook)) {
+        if (!$cook) {
             return response()->json([
                 'status' => 'no_data',
-                'message' => 'Unable to load your profile. Please try again!'
+                'message' => 'Unable to locate your profile for update.',
             ], 404);
         }
 
-        $profile_picture = null;
+        $cook->fill($request->only(['kitchen_name', 'mpesa_number', 'physical_address', 'google_map_pin']));
 
-        if (CookDocument::where('cook_id', $profile_cook->id)->exists()) {
-            $profile_picture = CookDocument::where('cook_id', $profile_cook->id)->first()->profile_pic;
+        if (!$cook->save()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update profile. Please try again.',
+            ], 500);
         }
 
-        if (!empty($profile_cook)) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'profile_pic' => $profile_picture,
-                'data' => $profile_cook,
-            ];
-        } else {
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load your profile. Please try again!'
-            ];
-        }
-        return response()->json($data);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Profile updated successfully.',
+        ], 200);
     }
 
-    //    get cook transactions
+    /**
+     * View a cook's profile.
+     */
+    public function profile(string $id)
+    {
+        $profile_cook = Cook::where('client_id', $id)->first();
+        $profile_picture = CookDocument::where('cook_id', $profile_cook->id)->value('profile_pic');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Profile retrieved successfully.',
+            'profile_pic' => $profile_picture,
+            'data' => $profile_cook,
+        ], 200);
+    }
+
+    /**
+     * Get all transactions for a cook.
+     */
     public function all_transactions(string $id)
     {
-        $client_id = Cook::where('id', $id)->first()->client_id;
-
-        $order_ids = DB::table('orders')->where('client_id', $client_id)->get()->pluck('id');
-
+        $client_id = Cook::where('id', $id)->value('client_id');
+        $order_ids = DB::table('orders')->where('client_id', $client_id)->pluck('id');
         $transactions = DB::table('order_payments')->whereIn('order_id', $order_ids)->get();
 
-        if (!empty($transactions)) {
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => $transactions,
-            ];
-        } else {
-            $data = [
+        return $this->generateResponse($transactions, 'Transactions');
+    }
+
+    /**
+     * Helper method for handling responses.
+     */
+    private function generateResponse($data, $entity)
+    {
+        if (empty($data)) {
+            return response()->json([
                 'status' => 'no_data',
-                'message' => 'Unable to load your transactions. Please try again!'
-            ];
+                'message' => "No $entity found.",
+            ], 404);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "$entity retrieved successfully.",
+            'data' => $data,
+        ], 200);
+    }
+
+    /**
+     * Helper method for uploading to S3.
+     */
+    private function uploadToS3($file, $prefix, $cookId)
+    {
+        $filename = $prefix . '_' . $cookId . '_' . time() . '.' . $file->getClientOriginalExtension();
+
+        if (in_array($file->getClientOriginalExtension(), ['jpg', 'jpeg', 'png'])) {
+            $image = Image::make($file)->resize(300, 200);
+            $fileContents = (string) $image->encode();
+        } else {
+            $fileContents = file_get_contents($file);
+        }
+
+        $path = "cooks/{$cookId}/{$filename}";
+        Storage::disk('s3')->put($path, $fileContents, 'public');
+
+        return Storage::disk('s3')->url($path);
     }
 }

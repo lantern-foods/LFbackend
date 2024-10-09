@@ -22,25 +22,27 @@ class UpdateDeliverycompanyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'full_name' => 'required',
-            'phone_number' => 'required',
-            'email' => 'required|email',
-            'company' => 'required',
-           
+            'full_name' => 'required|string|max:255',
+            'phone_number' => 'required|string|unique:delivery_companies,phone_number,' . $this->deliverycompany, // Ensure unique except for current record
+            'email' => 'required|email|unique:delivery_companies,email,' . $this->deliverycompany, // Ensure unique except for current record
+            'company' => 'required|string|max:255|unique:delivery_companies,company,' . $this->deliverycompany, // Ensure unique except for current record
         ];
     }
-      /**
-     * Rules messages
+
+    /**
+     * Custom error messages for validation rules.
      */
     public function messages(): array
     {
-
         return [
-            'full_name.required' => 'Delivery companie\'s full name is required!',
-            'email.required' => 'Delivery companie\'s email address is required!',
-            'phone_number.required' => 'Delivery companie\'s phone number is required!',
-            'company.required' => 'Delivery companie\'s company name is required!',
-            
+            'full_name.required' => 'Delivery company\'s full name is required!',
+            'phone_number.required' => 'Delivery company\'s phone number is required!',
+            'phone_number.unique' => 'This phone number is already in use by another company!',
+            'email.required' => 'Delivery company\'s email address is required!',
+            'email.email' => 'Please provide a valid email address!',
+            'email.unique' => 'This email address is already in use by another company!',
+            'company.required' => 'Delivery company\'s name is required!',
+            'company.unique' => 'This company name is already in use by another company!',
         ];
     }
 }

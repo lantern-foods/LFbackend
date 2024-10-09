@@ -7,147 +7,134 @@ use App\Http\Requests\UpdateVehicleRequest;
 use App\Http\Requests\VehicleRequest;
 use App\Models\Vehicle;
 use App\Traits\Vehicles;
-use Auth;
+use Illuminate\Support\Facades\Auth;
 
 class VehicleController extends Controller
 {
     use Vehicles;
 
     /**
-     * Display a listing of the resource.
+     * Display a listing of vehicles (assigned and unassigned).
      */
     public function index()
     {
-        $assigned_vehicles = Vehicle::where('deliverycmpy_id',Auth::id())->where('vehicle_status',1)->get();
-        $unassigned_vehicles = Vehicle::where('deliverycmpy_id',Auth::id())->where('vehicle_status',0)->get();
+        $assignedVehicles = Vehicle::where('deliverycmpy_id', Auth::id())
+            ->where('vehicle_status', 1)
+            ->get();
 
-    
+        $unassignedVehicles = Vehicle::where('deliverycmpy_id', Auth::id())
+            ->where('vehicle_status', 0)
+            ->get();
 
-            $data = [
-                'status' => 'success',
-                'message' => 'Request successful',
-                'data' => [$assigned_vehicles, $unassigned_vehicles ],
-            ];
-        
-        return response()->json($data);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Request successful',
+            'data' => [
+                'assigned_vehicles' => $assignedVehicles,
+                'unassigned_vehicles' => $unassignedVehicles
+            ],
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created vehicle in storage.
      */
     public function store(VehicleRequest $request)
     {
         $request->validated();
 
-        $deliverycmpy_id = $request->input('deliverycmpy_id');
-        $license_plate = $request->input('license_plate');
-        $make = $request->input('make');
-        $model = $request->input('model');
-        $description = $request->input('description');
+        $licensePlate = $request->input('license_plate');
 
-        if ($this->licensePlateExits($license_plate)) {
-
-            $data = [
+        if ($this->licensePlateExits($licensePlate)) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'License plate is already in use by another account!',
-            ];
-
-            return response()->json($data);
+                'message' => 'License plate is already in use by another vehicle!',
+            ], 400);
         }
 
         $vehicle = Vehicle::create([
-            'deliverycmpy_id' => $deliverycmpy_id,
-            'license_plate' => $license_plate,
-            'make' => $make,
-            'model' => $model,
-            'description' => $description,
+            'deliverycmpy_id' => $request->input('deliverycmpy_id'),
+            'license_plate' => $licensePlate,
+            'make' => $request->input('make'),
+            'model' => $request->input('model'),
+            'description' => $request->input('description'),
         ]);
 
         if ($vehicle) {
-
-            $data = [
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Vehicle created successfully.',
-            ];
-        } else {
-
-            $data = [
-                'status' => 'error',
-                'message' => 'A problem was encountered. vehicles was NOT created.Please try again!',
-            ];
+            ], 201);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered. Vehicle was NOT created. Please try again!',
+        ], 500);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Show the form for editing the specified vehicle.
      */
     public function edit(string $id)
     {
+        $vehicle = Vehicle::find($id);
 
-        $vehicle = Vehicle::where('id', $id)->first();
-
-        if (!empty($vehicle)) {
-
-            $data = [
+        if ($vehicle) {
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful!',
                 'data' => $vehicle,
-            ];
-        } else {
-
-            $data = [
-                'status' => 'no_data',
-                'message' => 'Unable to load vehicle. Please try again!',
-            ];
+            ]);
         }
-        return response()->json($data);
+
+        return response()->json([
+            'status' => 'no_data',
+            'message' => 'Unable to load vehicle. Please try again!',
+        ], 404);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update the specified vehicle in storage.
      */
     public function update(UpdateVehicleRequest $request, string $id)
     {
-
         $request->validated();
 
-        $license_plate = $request->input('license_plate');
-        $make = $request->input('make');
-        $model = $request->input('model');
-        $description = $request->input('description');
+        $licensePlate = $request->input('license_plate');
 
-        if ($this->licensePlateExits($license_plate) && !$this->licenseplateBelongsToVehicle($id, $license_plate)) {
-
-            $data = [
+        if ($this->licensePlateExits($licensePlate) && !$this->licenseplateBelongsToVehicle($id, $licensePlate)) {
+            return response()->json([
                 'status' => 'error',
-                'message' => 'License plate is already in use by another account!',
-            ];
+                'message' => 'License plate is already in use by another vehicle!',
+            ], 400);
         }
 
-        $vehicle = Vehicle::where('id',$id)->first();
+        $vehicle = Vehicle::find($id);
 
-        if (!empty($vehicle)) {
-            
-            $vehicle->license_plate = $license_plate;
-            $vehicle->make = $make;
-            $vehicle->model = $model;
-
-            if ($vehicle->update()) {
-                
-                $data = [
-                    'status' =>"success",
-                    'message' => 'Vehicle updated successfully'
-                ];
-            } else {
-                
-                $data = [
-                    'status' => 'error',
-                    'message' => 'A problem was encountered. Vehicle was NOt update. Please try again!',
-                ];
-            }
-            return response()->json($data);
+        if (!$vehicle) {
+            return response()->json([
+                'status' => 'no_data',
+                'message' => 'Vehicle not found!',
+            ], 404);
         }
+
+        $vehicle->license_plate = $licensePlate;
+        $vehicle->make = $request->input('make');
+        $vehicle->model = $request->input('model');
+        $vehicle->description = $request->input('description');
+
+        if ($vehicle->save()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Vehicle updated successfully.',
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered. Vehicle was NOT updated. Please try again!',
+        ], 500);
     }
 
     /**
@@ -155,6 +142,25 @@ class VehicleController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $vehicle = Vehicle::find($id);
+
+        if (!$vehicle) {
+            return response()->json([
+                'status' => 'no_data',
+                'message' => 'Vehicle not found!',
+            ], 404);
+        }
+
+        if ($vehicle->delete()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Vehicle deleted successfully.',
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'A problem was encountered. Vehicle was NOT deleted. Please try again!',
+        ], 500);
     }
 }

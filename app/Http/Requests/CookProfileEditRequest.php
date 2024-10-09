@@ -14,7 +14,6 @@ class CookProfileEditRequest extends FormRequest
         return true;
     }
 
-    
     /**
      * Get the validation rules that apply to the request.
      *
@@ -23,23 +22,23 @@ class CookProfileEditRequest extends FormRequest
     public function rules(): array
     {
         return [
-           'kitchen_name' => 'required',
-           'mpesa_number' =>'required',
-           'physical_address' => 'required',
-           'google_map_pin' =>'required',
+            'kitchen_name' => 'required|string|max:255',
+            'mpesa_number' => 'required|string|max:20',
+            'physical_address' => 'required|string|max:255',
+            'google_map_pin' => 'required|string|max:255',
         ];
     }
-    /**
-     * Rules messages
-     */
 
-    public function messages():array
+    /**
+     * Custom error messages for validation rules.
+     */
+    public function messages(): array
     {
         return [
-            'kitchen_name.required' => 'Cook\'s Kitchen name is required',
-            'mpesa_number.required' => 'Cook\'s Mpesa number is required',
-            'physical_address.required' => 'Cook\'s physical address is required',
-            'google_map_pin.required' => 'Cook\'s google map location is required',
+            'kitchen_name.required' => 'The kitchen name is required.',
+            'mpesa_number.required' => 'The Mpesa number is required.',
+            'physical_address.required' => 'The physical address is required.',
+            'google_map_pin.required' => 'The Google Map pin is required.',
         ];
     }
 }
