@@ -19,8 +19,11 @@ return new class extends Migration
             $table->tinyInteger('driver_rating');
             $table->timestamps();
 
-            // Foreign key constraint (assuming 'orders' table exists and 'id' is its primary key)
+            // Foreign key constraint for 'order_id'
             $table->foreign('order_id')->references('id')->on('orders')->onDelete('cascade');
+
+            // Foreign key constraint for 'client_id' (assuming 'clients' table exists)
+            $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
         });
     }
 

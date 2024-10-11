@@ -12,9 +12,9 @@ return new class extends Migration {
     {
         Schema::create('shift_admin_controls', function (Blueprint $table) {
             $table->id();
-            $table->time('shift_start_time')->default('6:00:00');
-            $table->time('shift_end_time')->default('10:00:00');
-            $table->boolean('all_shifts_closed')->default(false);
+            $table->time('shift_start_time')->default('06:00:00');  // Default shift start time
+            $table->time('shift_end_time')->default('10:00:00');    // Default shift end time
+            $table->boolean('all_shifts_closed')->default(false);   // Default: shifts are open
             $table->timestamps();
         });
     }

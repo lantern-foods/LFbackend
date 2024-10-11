@@ -23,13 +23,17 @@ return new class extends Migration
             $table->dateTime('response_date_time')->nullable()->comment="Date/Time payment response was received";
             $table->string('result_code')->nullable();
             $table->string('result_desc')->nullable();
-            $table->decimal('txn_amount',8,2)->nullable()->comment="Transaction Amount";
+            $table->decimal('txn_amount', 10, 2)->nullable()->comment="Transaction Amount"; // Increased precision
             $table->string('mpesa_receipt_no')->nullable()->comment="MPESA Confirmation Code";
             $table->string('sender_phone_no')->nullable()->comment="Customer/Sender's phone number";
             $table->string('txn_status')->default('Open')->comment="Open/Closed/Failed/Cancelled - Transaction Status";
             $table->timestamps();
 
-            $table->foreign('order_id')->references('id')->on('orders')->onUpdate('restrict')->onDelete('restrict');
+            // Foreign key with cascade to maintain integrity
+            $table->foreign('order_id')->references('id')->on('orders')->onUpdate('cascade')->onDelete('cascade');
+
+            // Add an index for better performance
+            $table->index('order_id');
         });
     }
 

@@ -16,12 +16,17 @@ return new class extends Migration
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('meal_id');
             $table->integer('qty');
-            $table->decimal('unit_price',8,2);
-            $table->decimal('subtotal',8,2);
+            $table->decimal('unit_price', 10, 2); // Increased precision
+            $table->decimal('subtotal', 10, 2); // Increased precision
             $table->timestamps();
 
-            $table->foreign('order_id')->references('id')->on('orders')->onUpdate('restrict')->onDelete('restrict');
-            $table->foreign('meal_id')->references('id')->on('meals')->onUpdate('restrict')->onDelete('restrict');
+            // Foreign key constraints with cascade on delete/update
+            $table->foreign('order_id')->references('id')->on('orders')->onUpdate('cascade')->onDelete('cascade');
+            $table->foreign('meal_id')->references('id')->on('meals')->onUpdate('cascade')->onDelete('cascade');
+
+            // Indexes to improve query performance
+            $table->index('order_id');
+            $table->index('meal_id');
         });
     }
 

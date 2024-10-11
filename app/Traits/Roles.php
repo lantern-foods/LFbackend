@@ -1,21 +1,21 @@
 <?php
 
 namespace App\Traits;
-use DB;
 
-trait Roles{
-    
-    /*
-    * Checks if role exists
-    */
-    public function roleExists($role_name)
+use Illuminate\Support\Facades\DB;
+
+trait Roles
+{
+    /**
+     * Check if a role exists in the database.
+     *
+     * @param string $roleName
+     * @return bool
+     */
+    public function roleExists(string $roleName): bool
     {
-        $role_exists = DB::table('roles')->where('name', '=', $role_name)->first();
-
-        if (!empty($role_exists)) {
-            return true;
-        } else {
-            return false;
-        }
+        return DB::table('roles')
+            ->where('name', $roleName)
+            ->exists();
     }
 }

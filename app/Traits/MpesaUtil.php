@@ -8,181 +8,155 @@ use Carbon\Carbon;
 
 trait MpesaUtil
 {
+    private const SANDBOX_URL = 'https://sandbox.safaricom.co.ke';
+    private const PRODUCTION_URL = 'https://api.safaricom.co.ke';
 
-    /*
-        * Generate access Token
-        */
-    public function getAccessToken($consumerKey, $consumerSecret)
+    private const ACCESS_TOKEN_ENDPOINT = '/oauth/v1/generate?grant_type=client_credentials';
+    private const STK_PUSH_ENDPOINT = '/mpesa/stkpush/v1/processrequest';
+
+    /**
+     * Get the base URL for Mpesa API based on environment
+     */
+    private function getMpesaBaseUrl(): string
     {
+        return config('payment_methods.mpesa.mpesa_env') === 'sandbox' ? self::SANDBOX_URL : self::PRODUCTION_URL;
+    }
 
-        if (config('payment_methods.mpesa.mpesa_env') == 'sandbox') {
-            $apiUrl = 'https://sandbox.safaricom.co.ke';
-        } else {
-            $apiUrl = 'https://api.safaricom.co.ke';
-        }
+    /**
+     * Generate Mpesa Access Token
+     */
+    public function getAccessToken(string $consumerKey, string $consumerSecret)
+    {
+        $apiUrl = $this->getMpesaBaseUrl() . self::ACCESS_TOKEN_ENDPOINT;
+        \Log::info("Access Token URL: {$apiUrl}");
 
-        \Log::info("Token URL " . $apiUrl);
+        $credentials = base64_encode("{$consumerKey}:{$consumerSecret}");
 
-        $credentials = base64_encode($consumerKey . ':' . $consumerSecret);
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, '' . $apiUrl . '/oauth/v1/generate?grant_type=client_credentials');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Authorization: Basic ' . $credentials, 'Content-Type: application/json'));
+        curl_setopt($ch, CURLOPT_URL, $apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Basic ' . $credentials,
+            'Content-Type: application/json'
+        ]);
 
-        // ignore ssl
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
         $response = curl_exec($ch);
-        curl_close($ch);
-        \Log::info("Token Response " . $response);
-
         if ($response === false) {
-            $error = curl_error($ch);
+            \Log::error("cURL Error: " . curl_error($ch));
             curl_close($ch);
-            \Log::error("cURL Error: " . $error);
             return null;
         }
 
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($httpCode != 200) {
-            \Log::error("HTTP Error: " . $httpCode . " Response: " . $response);
+        if ($httpCode !== 200) {
+            \Log::error("HTTP Error: {$httpCode} Response: {$response}");
             return null;
         }
 
-        $response = json_decode($response);
-        \Log::info("Token response: " . print_r($response, true));
+        $decodedResponse = json_decode($response, true);
+        return $decodedResponse['access_token'] ?? null;
+    }
 
-        if (!empty($response) && isset($response->access_token)) {
-            $this->access_token = $response->access_token;
-            return $this->access_token;
+    /**
+     * Initiate Mpesa STK Push Payment
+     */
+    public function stkPush(string $phone_no, string $order_id, float $order_total)
+    {
+        $amount = intval($order_total);
+        $timestamp = date('YmdHis');
+        $businessShortCode = config('payment_methods.mpesa.business_short_code');
+        $passKey = config('payment_methods.mpesa.pass_key');
+
+        $password = base64_encode("{$businessShortCode}{$passKey}{$timestamp}");
+
+        $accessToken = $this->getAccessToken(
+            config('payment_methods.mpesa.consumer_key'),
+            config('payment_methods.mpesa.consumer_secret')
+        );
+
+        if (empty($accessToken)) {
+            \Log::error("Failed to generate Mpesa access token.");
+            return false;
+        }
+
+        $url = $this->getMpesaBaseUrl() . self::STK_PUSH_ENDPOINT;
+        $payload = [
+            'BusinessShortCode' => $businessShortCode,
+            'Password' => $password,
+            'Timestamp' => $timestamp,
+            'TransactionType' => config('payment_methods.mpesa.transaction_type'),
+            'Amount' => $amount,
+            'PartyA' => $phone_no,
+            'PartyB' => config('payment_methods.mpesa.party_b'),
+            'PhoneNumber' => $phone_no,
+            'CallBackURL' => config('payment_methods.mpesa.call_back_url'),
+            'AccountReference' => 'Order_' . $order_id,
+            'TransactionDesc' => 'Order Payment'
+        ];
+
+        \Log::info("STK Push Payload: " . json_encode($payload));
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type:application/json',
+            'Authorization:Bearer ' . $accessToken
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+        $response = curl_exec($ch);
+        if ($response === false) {
+            \Log::error("cURL Error: " . curl_error($ch));
+            curl_close($ch);
+            return false;
+        }
+
+        $responseData = json_decode($response, true);
+        curl_close($ch);
+
+        \Log::info("STK Push Response: " . print_r($responseData, true));
+
+        if (!empty($responseData['MerchantRequestID']) && !empty($responseData['CheckoutRequestID'])) {
+            return $this->logStkPushResponse($responseData, $order_id);
         } else {
-            $this->access_token = null;
-            return null;
+            \Log::error("STK Push Failed: " . $response);
+            return false;
         }
     }
 
-    public function stkPush($phone_no, $order_id, $order_total)
+    /**
+     * Log STK Push response to the database
+     */
+    private function logStkPushResponse(array $data, string $order_id): bool
     {
-        $amount_to_pay = $order_total;
-        $partyA = $phone_no;
-        $businessShortCode = config('payment_methods.mpesa.business_short_code');
-        $amount_without_decimal = explode(".", $amount_to_pay);
-        $amount = $amount_without_decimal[0];
+        $order = Order::where('order_no', $order_id)->first();
 
+        if ($order) {
+            $logData = [
+                'order_id' => $order->id,
+                'request_date_time' => Carbon::now(),
+                'merchant_request_id' => $data['MerchantRequestID'],
+                'checkout_request_id' => $data['CheckoutRequestID'],
+                'response_code' => $data['ResponseCode'] ?? 'N/A',
+                'response_desc' => $data['ResponseDescription'] ?? 'N/A',
+                'customer_msg' => $data['CustomerMessage'] ?? 'N/A',
+                'created_at' => Carbon::now()
+            ];
 
-        \Log::info("Short code " . $businessShortCode);
-
-        $callBackUrl = config('payment_methods.mpesa.call_back_url');
-
-        \Log::info("CallBack URL " . $callBackUrl);
-
-        /*
-            * Generate password
-            */
-        $timestamp = date('YmdHis');
-        $passKey = config('payment_methods.mpesa.pass_key');
-        $passwd = base64_encode($businessShortCode . $passKey . $timestamp);
-
-        /*
-            * Generate access token
-            */
-        $consumerKey = config('payment_methods.mpesa.consumer_key');
-        $consumerSecret = config('payment_methods.mpesa.consumer_secret');
-        $partyB = config('payment_methods.mpesa.party_b');
-        $transaction_type = config('payment_methods.mpesa.transaction_type');
-
-        $accessToken = $this->getAccessToken($consumerKey, $consumerSecret);
-
-        \Log::info("Token " . $accessToken);
-        if (!empty($accessToken)) {
-
-            if (config('payment_methods.mpesa.mpesa_env') == 'sandbox') {
-                $url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
-            } else {
-                $url = 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
-            }
-
-            $curl = curl_init();
-            curl_setopt($curl, CURLOPT_URL, $url);
-            curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-Type:application/json', 'Authorization:Bearer ' . $accessToken));
-
-
-            $curl_post_data = array(
-                //Fill in the request parameters with valid values
-                'BusinessShortCode' => $businessShortCode,
-                'Password' => $passwd,
-                'Timestamp' => $timestamp,
-                'TransactionType' => $transaction_type,
-                'Amount' => $amount,
-                'PartyA' => $partyA,
-                'PartyB' => $partyB,
-                'PhoneNumber' => $partyA,
-                'CallBackURL' => $callBackUrl,
-                'AccountReference' => "N/A",
-                'TransactionDesc' => 'Subscription Payment'
-            );
-
-            $data_string = json_encode($curl_post_data);
-
-            \Log::info("Curl Post data " . $data_string);
-
-            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($curl, CURLOPT_POST, true);
-            curl_setopt($curl, CURLOPT_POSTFIELDS, $data_string);
-
-            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, FALSE);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
-
-            $curl_response = curl_exec($curl);
-
-            $data  = json_decode($curl_response, true);
-
-            \Log::info("Request " . $curl_response);
-
-            if (!empty($data)) {
-                if (!empty($data['MerchantRequestID']) && !empty($data['CheckoutRequestID'])) {
-                    $MerchantRequestID = $data['MerchantRequestID'];
-                    $CheckoutRequestID = $data['CheckoutRequestID'];
-                    $ResponseCode = $data['ResponseCode'];
-                    $ResponseDescription = $data['ResponseDescription'];
-                    $CustomerMessage = $data['CustomerMessage'];
-                    $request_date_time = Carbon::now();
-                    $order_idd = Order::where('order_no', $order_id)->first()->id;
-
-                    $stk_curl_response = array(
-                        "order_id" => $order_idd,
-                        "request_date_time" => $request_date_time,
-                        "merchant_request_id" => $MerchantRequestID,
-                        "checkout_request_id" => $CheckoutRequestID,
-                        "response_code" => $ResponseCode,
-                        "response_desc" => $ResponseDescription,
-                        "customer_msg" => $CustomerMessage,
-                        "created_at" => $request_date_time
-                    );
-
-                    //Set Checkout Request ID in session for use in verifying payment
-                    session()->put('CheckoutRequestID', $CheckoutRequestID);
-
-                    //Save MPESA payment details
-                    $log_stk_curl_resp = DB::table('mpesa_transactions')->insert([$stk_curl_response]);
-                    if ($log_stk_curl_resp) {
-                        \Log::info("STK curl response was saved successfully!");
-
-                        return true;
-                    } else {
-                        \Log::error("A problem as encountered,STK curl response was NOT saved!");
-
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            } else {
-                return false;
-            }
+            DB::table('mpesa_transactions')->insert($logData);
+            \Log::info("STK Push response logged successfully!");
+            return true;
         } else {
+            \Log::error("Order not found for Order ID: {$order_id}");
             return false;
         }
     }

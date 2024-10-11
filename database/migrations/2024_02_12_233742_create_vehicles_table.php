@@ -13,12 +13,18 @@ return new class extends Migration
     {
         Schema::create('vehicles', function (Blueprint $table) {
             $table->id();
-            $table->integer('deliverycmpy_id');
-            $table->string('license_plate');
+            $table->unsignedBigInteger('deliverycmpy_id');
+            $table->string('license_plate')->unique(); // Added unique constraint
             $table->string('make');
             $table->string('model');
             $table->string('description')->nullable();
             $table->timestamps();
+
+            // Add foreign key constraint for delivery companies
+            $table->foreign('deliverycmpy_id')->references('id')->on('delivery_companies')->onUpdate('cascade')->onDelete('cascade');
+
+            // Indexing
+            $table->index('deliverycmpy_id');
         });
     }
 

@@ -24,15 +24,19 @@ class RouteServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Define rate limiting for the API routes
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Register routes for the application
         $this->routes(function () {
+            // Define API routes with the 'api' middleware and prefix
             Route::middleware('api')
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
+            // Define web routes with the 'web' middleware
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
         });

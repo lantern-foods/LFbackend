@@ -1,29 +1,68 @@
 <?php
+
 namespace App\Traits;
 
 use App\Models\Client;
 
 trait Clients
 {
-    /*
-     * Check whether email Address exits
+    /**
+     * Check whether the email address exists
+     *
+     * @param string $email_address
+     * @return bool
      */
     public function emailAddressExists($email_address)
     {
-        $flag = false;
-
-        $email_address = Client::where('email_address', $email_address)->count();
-
-        if ($email_address > 0) {
-            $flag = true;
-        }
-        return $flag;
+        return Client::where('email_address', $email_address)->exists();
     }
 
-    /*
-     * Check whether phone number exists
+    /**
+     * Check whether the phone number exists
+     *
+     * @param string $phone_number
+     * @return bool
      */
-    private function get_msisdn_network($msisdn)
+    public function phonenoExists($phone_number)
+    {
+        return Client::where('phone_number', $phone_number)->exists();
+    }
+
+    /**
+     * Check if the email belongs to the specified client
+     *
+     * @param int $client_id
+     * @param string $email_address
+     * @return bool
+     */
+    public function emailBelongsToClient($client_id, $email_address)
+    {
+        return Client::where('id', $client_id)
+            ->where('email_address', $email_address)
+            ->exists();
+    }
+
+    /**
+     * Check if the phone number belongs to the specified client
+     *
+     * @param int $client_id
+     * @param string $phone_number
+     * @return bool
+     */
+    public function phoneBelongsToClient($client_id, $phone_number)
+    {
+        return Client::where('id', $client_id)
+            ->where('phone_number', $phone_number)
+            ->exists();
+    }
+
+    /**
+     * Get the MSISDN network (phone number's mobile carrier)
+     *
+     * @param string $msisdn
+     * @return array [formatted_msisdn, operator]
+     */
+    public function get_msisdn_network($msisdn)
     {
         $regex = [
             'airtel' => '/^\+?(254|0|)7(?:[38]\d{7}|5[0-6]\d{6})\b/',
@@ -37,54 +76,15 @@ trait Clients
                 return [preg_replace('/^\+?(254|0)/', '254', $msisdn), $operator];
             }
         }
+
         return [false, false];
     }
 
-    public function phonenoExists($phone_number)
-    {
-        $flag = false;
-
-        $phone_number_exist = Client::where('phone_number', $phone_number)->count();
-        return $phone_number_exist;
-        if ($phone_number > 0) {
-            $flag = true;
-        }
-        return $flag;
-    }
-
-    /*
-     * Check if email belongs to the client
+    /**
+     * Placeholder method for meal ratings (to be implemented)
      */
-    public function emailBelongsToClient($client_id, $email_address)
+    public function getMealRatings()
     {
-        $email_belongs_to_client = false;
-
-        $client = Client::where('id', $client_id)->where('email_address', $email_address)->count();
-
-        if ($client > 0) {
-            $email_belongs_to_client = true;
-        }
-
-        return $email_belongs_to_client;
-    }
-
-    /*
-     * Check if phone number belongs to the client
-     */
-    public function phoneBelongsToClient($client_id, $phone_number)
-    {
-        $phonenumber_belongs_to_client = false;
-
-        $client = Client::where('id', $client_id)->where('phone_number', $phone_number)->count();
-
-        if ($client > 0) {
-            $phonenumber_belongs_to_client = true;
-        }
-        return $phonenumber_belongs_to_client;
-    }
-    public  function  getMealRatings()
-    {
-//
-
+        // Placeholder for meal ratings functionality
     }
 }

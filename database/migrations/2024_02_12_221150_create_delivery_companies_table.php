@@ -14,13 +14,17 @@ return new class extends Migration
         Schema::create('delivery_companies', function (Blueprint $table) {
             $table->id();
             $table->string('full_name');
-            $table->string('phone_number');
+            $table->string('phone_number')->unique(); // Added uniqueness constraint
             $table->string('email')->unique();
             $table->string('company')->nullable();
             $table->string('password')->nullable();
             $table->string('delvry_otp')->nullable();
-            $table->string('location_charge')->nullable();
+            $table->decimal('location_charge', 8, 2)->nullable()->comment('Delivery location charge'); // Changed to decimal
             $table->timestamps();
+
+            // Add indexes to frequently queried fields
+            $table->index('email');
+            $table->index('phone_number');
         });
     }
 

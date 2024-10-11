@@ -1,103 +1,62 @@
 <?php
+
 namespace App\Traits;
 
 use App\Models\Driver;
 
 trait Drivers
 {
-
-    /***
-     * Check whether email adddress exist
+    /**
+     * Check whether email address exists.
      */
-    public function emailAddressExists($email)
+    public function emailAddressExists($email): bool
     {
-        $flag = false;
-
-        $email = Driver::where('email', $email)->count();
-
-        if ($email > 0) {
-            $flag = true;
-        }
-        return $flag;
-    }
-
-    /***
-     * Check whether phone number exits
-     */
-    public function phonenoExists($phone_number)
-    {
-        $flag = false;
-
-        $phone_number = Driver::Where('phone_number', $phone_number)->count();
-
-        if ($phone_number > 0) {
-            $flag = true;
-        }
-        return $flag;
+        return Driver::where('email', $email)->exists();
     }
 
     /**
-     * Check if id number exits
+     * Check whether phone number exists.
      */
-    public function idnumberExists($id_number)
+    public function phonenoExists($phone_number): bool
     {
-        $flag = false;
-
-        $id_number = Driver::where('id_number', $id_number)->count();
-
-        if ($id_number > 0) {
-
-            $flag = true;
-        }
-        return $flag;
+        return Driver::where('phone_number', $phone_number)->exists();
     }
 
     /**
-     * Check whether if id number belongs to driver
-     *
+     * Check whether ID number exists.
      */
-    public function emailBelongsToDriver($driver_id, $email)
+    public function idnumberExists($id_number): bool
     {
-        $email_belongs_to_driver = false;
-
-        $driver = Driver::where('id', $driver_id)->where('email', $email)->count();
-
-        if ($driver > 0) {
-            $email_belongs_to_driver=true;
-        }
-        return $email_belongs_to_driver;
-    }
-
-    /***
-     * Check if phone number belongs to driver
-     */
-    public function phoneBelongsToDriver($driver_id, $phone_number)
-    {
-        $phonenumber_belongs_to_driver=false;
-
-        $driver = Driver::where('id', $driver_id)->where('phone_number',$phone_number)->count();
-
-        if ($driver > 0) {
-            $phonenumber_belongs_to_driver=true;
-
-        }
-        return $phonenumber_belongs_to_driver;
+        return Driver::where('id_number', $id_number)->exists();
     }
 
     /**
-     * Check if id number belongs to driver
+     * Check if the email belongs to the specified driver.
      */
-    public function idnumberBelongsToDriver($driver_id,$id_number)
+    public function emailBelongsToDriver($driver_id, $email): bool
     {
-        $idnumber_belongs_to_driver=false;
-
-        $driver = Driver::where('id',$driver_id)->where('id_number',$id_number)->count();
-
-        if ($driver > 0) {
-            
-            $idnumber_belongs_to_driver=true;
-        }
-        return $idnumber_belongs_to_driver;
+        return Driver::where('id', $driver_id)
+                     ->where('email', $email)
+                     ->exists();
     }
 
+    /**
+     * Check if the phone number belongs to the specified driver.
+     */
+    public function phoneBelongsToDriver($driver_id, $phone_number): bool
+    {
+        return Driver::where('id', $driver_id)
+                     ->where('phone_number', $phone_number)
+                     ->exists();
+    }
+
+    /**
+     * Check if the ID number belongs to the specified driver.
+     */
+    public function idnumberBelongsToDriver($driver_id, $id_number): bool
+    {
+        return Driver::where('id', $driver_id)
+                     ->where('id_number', $id_number)
+                     ->exists();
+    }
 }

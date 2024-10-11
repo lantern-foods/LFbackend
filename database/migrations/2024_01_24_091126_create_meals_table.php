@@ -13,19 +13,19 @@ return new class extends Migration
     {
         Schema::create('meals', function (Blueprint $table) {
             $table->id();
-            $table->integer('cook_id')->comments="This is Client it from the clients table";
+            $table->unsignedBigInteger('cook_id')->comment("Foreign key from the clients table (Cook is a Client)");
             $table->string('meal_name');
-            $table->decimal('meal_price',15,2);
-            $table->integer('min_qty')->comments="Minimum quantity for order";
-            $table->integer('max_qty')->comments="Maximum quantity for order";
+            $table->decimal('meal_price', 15, 2);
+            $table->integer('min_qty')->comment("Minimum quantity for order");
+            $table->integer('max_qty')->comment("Maximum quantity for order");
             $table->string('meal_type');
             $table->string('prep_time');
-            $table->string('meal_desc');
-            $table->string('ingredients');
-            $table->string('serving_advice');
+            $table->text('meal_desc');
+            $table->text('ingredients');
+            $table->text('serving_advice');
             $table->integer('booked_status')->default(1);
             $table->integer('express_status')->default(0);
-            $table->integer('status')->default(0)->comments="Checks if meal has been approved ie. 0 no approved";
+            $table->integer('status')->default(0)->comment("0 indicates meal is not approved");
             $table->timestamps();
         });
     }

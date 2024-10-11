@@ -13,9 +13,12 @@ return new class extends Migration
     {
         Schema::create('meals_images', function (Blueprint $table) {
             $table->id();
-            $table->integer('meal_id');
+            $table->unsignedBigInteger('meal_id');
             $table->string('image_url');
             $table->timestamps();
+
+            // Foreign key constraint
+            $table->foreign('meal_id')->references('id')->on('meals')->onDelete('cascade');
         });
     }
 

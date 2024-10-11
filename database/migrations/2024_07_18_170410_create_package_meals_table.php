@@ -17,6 +17,10 @@ return new class extends Migration
             $table->unsignedBigInteger('meal_id');
             $table->integer('quantity')->default(0);
             $table->timestamps();
+
+            // Foreign key constraints
+            $table->foreign('package_id')->references('id')->on('packages')->onDelete('cascade');
+            $table->foreign('meal_id')->references('id')->on('meals')->onDelete('cascade');
         });
     }
 

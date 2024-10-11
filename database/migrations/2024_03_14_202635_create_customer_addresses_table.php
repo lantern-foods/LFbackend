@@ -17,6 +17,9 @@ return new class extends Migration
             $table->string('location_name');
             $table->integer('location_status')->default(0);
             $table->timestamps();
+
+            // Adding foreign key constraint
+            $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
         });
     }
 

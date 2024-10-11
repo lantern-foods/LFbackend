@@ -17,12 +17,23 @@ return new class extends Migration
             $table->unsignedBigInteger('meal_id')->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->unsignedBigInteger('package_id')->nullable();
-            $table->integer('packaging')->nullable();
-            $table->integer('taste')->nullable();
 
-            $table->integer('service')->nullable();
-            $table->string('review',400)->nullable();
+            $table->integer('packaging')->nullable()->default(0);
+            $table->integer('taste')->nullable()->default(0);
+            $table->integer('service')->nullable()->default(0);
+
+            $table->string('review', 400)->nullable();
             $table->timestamps();
+
+            // Adding foreign key constraints for data integrity
+            $table->foreign('meal_id')->references('id')->on('meals')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('package_id')->references('id')->on('packages')->onDelete('cascade');
+
+            // Adding indexes to improve query performance
+            $table->index('meal_id');
+            $table->index('user_id');
+            $table->index('package_id');
         });
     }
 

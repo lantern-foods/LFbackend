@@ -12,12 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('shift_meals', function (Blueprint $table) {
-            //
-            if(!Schema::hasColumn('shift_meals', 'quantity')){
+            // Add 'quantity' column if it doesn't exist
+            if (!Schema::hasColumn('shift_meals', 'quantity')) {
                 $table->integer('quantity')->after('meal_id')->default(1);
             }
-            if(!Schema::hasColumn('shift_meals', 'created_at')){
 
+            // Add timestamps if they don't exist
+            if (!Schema::hasColumns('shift_meals', ['created_at', 'updated_at'])) {
                 $table->timestamps();
             }
         });
@@ -29,10 +30,13 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('shift_meals', function (Blueprint $table) {
-            //
-            if(Schema::hasColumn('shift_meals', 'quantity')){
+            // Remove 'quantity' column if it exists
+            if (Schema::hasColumn('shift_meals', 'quantity')) {
                 $table->dropColumn('quantity');
             }
+
+            // Remove timestamps
+            $table->dropTimestamps();
         });
     }
 };

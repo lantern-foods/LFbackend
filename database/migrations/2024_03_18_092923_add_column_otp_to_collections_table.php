@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('collections', function (Blueprint $table) {
-            $table->string('otp')->nullable()->comment="driver reassign OTP";
+            $table->string('otp')->nullable()->comment("driver reassign OTP");
         });
     }
 

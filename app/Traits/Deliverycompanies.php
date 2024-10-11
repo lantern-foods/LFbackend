@@ -5,61 +5,39 @@ use App\Models\Deliverycompany;
 
 trait Deliverycompanies
 {
-    /*
-     *
-     * Check whethwer email Address exits
+    /**
+     * Check if email address exists in the delivery companies.
      */
-    public function emailAddressExists($email)
+    public function emailAddressExists($email): bool
     {
-        $flag = false;
-
-        $email_address = Deliverycompany::where('email', $email)->count();
-
-        if ($email_address > 0) {
-            $flag = true;
-        }
-        return $flag;
-    }
-    /*
-    * Check whether phone number exists
-    */
-    public function phonenoExists($phone_number)
-    {
-        $flag = false;
-
-        $phone_number=Deliverycompany::where('phone_number',$phone_number)->count();
+        return Deliverycompany::where('email', $email)->exists();
     }
 
-    /*
-     *Check if email belongs to the delivery company
+    /**
+     * Check if phone number exists in the delivery companies.
      */
-    public function emailBelongsToDeliverycompany($deliverycompany_id,$email_address)
+    public function phonenoExists($phone_number): bool
     {
-        $email_belongs_to_deliverycompany=false;
-
-        $deliverycompany=Deliverycompany::where('id',$deliverycompany_id)->where('email',$email_address)->count();
-
-        if ($deliverycompany>0) {
-            $email_belongs_to_deliverycompany=true;
-        }
-
-        return $email_belongs_to_deliverycompany;
+        return Deliverycompany::where('phone_number', $phone_number)->exists();
     }
 
-    /*
-     *Check if phone number belongs to the delivery company
+    /**
+     * Check if the email belongs to the specified delivery company.
      */
-    public function phoneBelongsToDeliverycompany($deliverycompany_id,$phone_number)
+    public function emailBelongsToDeliverycompany($deliverycompany_id, $email_address): bool
     {
-        $phonenumber_belongs_to_deliverycompany=false;
-
-        $deliverycompany=Deliverycompany::where('id',$deliverycompany_id)->where('phone_number',$phone_number)->count();
-
-        if ($deliverycompany>0) {
-            $phonenumber_belongs_to_deliverycompany=true;
-        }
-        return $phonenumber_belongs_to_deliverycompany;
+        return Deliverycompany::where('id', $deliverycompany_id)
+            ->where('email', $email_address)
+            ->exists();
     }
 
-
+    /**
+     * Check if the phone number belongs to the specified delivery company.
+     */
+    public function phoneBelongsToDeliverycompany($deliverycompany_id, $phone_number): bool
+    {
+        return Deliverycompany::where('id', $deliverycompany_id)
+            ->where('phone_number', $phone_number)
+            ->exists();
+    }
 }

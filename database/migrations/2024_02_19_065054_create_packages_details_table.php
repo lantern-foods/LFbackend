@@ -11,11 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('packages_details', function (Blueprint $table) {
+        Schema::create('package_details', function (Blueprint $table) {
             $table->id();
-            $table->integer('package_id');
-            $table->integer('meal_id');
+            $table->unsignedBigInteger('package_id');
+            $table->unsignedBigInteger('meal_id');
             $table->timestamps();
+
+            // Foreign key constraints
+            $table->foreign('package_id')->references('id')->on('packages')->onUpdate('cascade')->onDelete('cascade');
+            $table->foreign('meal_id')->references('id')->on('meals')->onUpdate('cascade')->onDelete('cascade');
+
+            // Indexes
+            $table->index('package_id');
+            $table->index('meal_id');
         });
     }
 
@@ -24,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('packages_details');
+        Schema::dropIfExists('package_details');
     }
 };

@@ -8,7 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
-use App\Models\Collection; 
+use App\Models\Collection;
 
 class AssignOrdersToNearestRider implements ShouldQueue
 {
@@ -16,6 +16,7 @@ class AssignOrdersToNearestRider implements ShouldQueue
 
     public function handle()
     {
+        // Fetch orders ready for pickup
         $orders = DB::table('orders')
                     ->join('order_details', 'order_details.order_id', '=', 'orders.id')
                     ->join('meals', 'order_details.meal_id', '=', 'meals.id')
@@ -24,9 +25,11 @@ class AssignOrdersToNearestRider implements ShouldQueue
                     ->select('orders.id as orderId', 'cooks.google_map_pin', 'meals.cook_id')
                     ->get();
 
+        // Assign each order to the nearest rider
         foreach ($orders as $order) {
             $riders = $this->getAvailableRiders();
             [$cookLat, $cookLong] = explode(',', $order->google_map_pin);
+
             $nearestRiderId = $this->findNearestRider($riders, $cookLat, $cookLong);
 
             if ($nearestRiderId && $this->canAssignOrder($nearestRiderId)) {
@@ -35,17 +38,29 @@ class AssignOrdersToNearestRider implements ShouldQueue
         }
     }
 
+    /**
+     * Retrieve all available riders.
+     */
     protected function getAvailableRiders()
     {
-        $riders = DB::table('drivers')->where('login_status', '=', 1)->select('id', 'login_location')->get();
+        // Fetch all drivers with login status and parse their coordinates
+        $riders = DB::table('drivers')
+                    ->where('login_status', '=', 1)
+                    ->select('id', 'login_location')
+                    ->get();
+
         foreach ($riders as $rider) {
             [$lat, $lon] = explode(',', $rider->login_location);
             $rider->latitude = $lat;
             $rider->longitude = $lon;
         }
+
         return $riders;
     }
 
+    /**
+     * Find the nearest rider to the cook's location.
+     */
     protected function findNearestRider($riders, $cookLat, $cookLong)
     {
         $nearestRiderId = null;
@@ -63,6 +78,9 @@ class AssignOrdersToNearestRider implements ShouldQueue
         return $nearestRiderId;
     }
 
+    /**
+     * Calculate the Haversine distance between two coordinates.
+     */
     protected function calculateHaversineDistance($latFrom, $longFrom, $latTo, $longTo)
     {
         $earthRadius = 6371; // Radius of the earth in kilometers
@@ -77,28 +95,35 @@ class AssignOrdersToNearestRider implements ShouldQueue
         return $earthRadius * $c; // Distance in kilometers
     }
 
+    /**
+     * Check if a rider can be assigned more orders.
+     */
     protected function canAssignOrder($riderId)
     {
         $assignedOrdersCount = DB::table('collections')
-                              ->where('driver_id', $riderId)
-                              ->where('status', '!=', 'DELIVERED')
-                              ->count();
+                                 ->where('driver_id', $riderId)
+                                 ->where('status', '!=', 'DELIVERED')
+                                 ->count();
 
-        return $assignedOrdersCount < 5; // Assuming a maximum of 5 undelivered orders per rider
+        return $assignedOrdersCount < 5; // Limit to 5 undelivered orders per rider
     }
 
+    /**
+     * Assign the order to the rider.
+     */
     protected function assignOrderToRider($orderId, $cookId, $riderId)
     {
+        // Check if the order has already been assigned
         $existingAssignment = Collection::where('order_id', $orderId)->first();
 
         if (!$existingAssignment) {
-            $collection = new Collection();
-            $collection->order_id = $orderId;
-            $collection->cook_id = $cookId;
-            $collection->driver_id = $riderId;
-            $collection->status = "ready for pickup";
-            $collection->save();
-
+            // Create a new collection record to assign the order to the rider
+            Collection::create([
+                'order_id' => $orderId,
+                'cook_id' => $cookId,
+                'driver_id' => $riderId,
+                'status' => 'ready for pickup',
+            ]);
         }
     }
 }

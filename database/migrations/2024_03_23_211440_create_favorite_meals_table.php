@@ -11,20 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-     if(!Schema::hasTable('favorite_meals')){
-       Schema::create('favorite_meals', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('client_id');
-            $table->unsignedBigInteger('meal_id');
-            $table->timestamps();
-            
-            $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
-            $table->foreign('meal_id')->references('id')->on('meals')->onDelete('cascade');
-           
-        });
+        if (!Schema::hasTable('favorite_meals')) {
+            Schema::create('favorite_meals', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('client_id');
+                $table->unsignedBigInteger('meal_id');
+                $table->timestamps();
 
-
-    }
+                // Foreign key constraints
+                $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
+                $table->foreign('meal_id')->references('id')->on('meals')->onDelete('cascade');
+            });
+        }
     }
 
     /**

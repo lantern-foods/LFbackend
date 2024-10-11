@@ -12,16 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('oauth_clients', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->unsignedBigInteger('user_id')->nullable()->index();
-            $table->string('name');
-            $table->string('secret', 100)->nullable();
-            $table->string('provider')->nullable();
-            $table->text('redirect');
-            $table->boolean('personal_access_client');
-            $table->boolean('password_client');
-            $table->boolean('revoked');
-            $table->timestamps();
+            $table->uuid('id')->primary(); // UUID primary key for the client ID
+            $table->unsignedBigInteger('user_id')->nullable()->index(); // Optional, indexed user_id for the client owner
+            $table->string('name'); // Name of the client application
+            $table->string('secret', 100)->nullable(); // Secret key for the client (nullable for some clients)
+            $table->string('provider')->nullable(); // Provider for user authentication (nullable)
+            $table->text('redirect'); // Redirect URI after successful authentication
+            $table->boolean('personal_access_client'); // Whether this client is for personal access tokens
+            $table->boolean('password_client'); // Whether this client is for password grant tokens
+            $table->boolean('revoked'); // Whether this client is revoked
+            $table->timestamps(); // Timestamps for creation and updates
         });
     }
 

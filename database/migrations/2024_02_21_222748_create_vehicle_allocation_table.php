@@ -11,11 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('vehicle_allocation', function (Blueprint $table) {
+        Schema::create('vehicle_allocations', function (Blueprint $table) {
             $table->id();
-            $table->integer('driver_id');
-            $table->integer('vehicle_id');
+            $table->unsignedBigInteger('driver_id');
+            $table->unsignedBigInteger('vehicle_id');
             $table->timestamps();
+
+            // Foreign key constraints
+            $table->foreign('driver_id')->references('id')->on('drivers')->onDelete('cascade');
+            $table->foreign('vehicle_id')->references('id')->on('vehicles')->onDelete('cascade');
         });
     }
 
@@ -24,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('vehicle_allocation');
+        Schema::dropIfExists('vehicle_allocations');
     }
 };

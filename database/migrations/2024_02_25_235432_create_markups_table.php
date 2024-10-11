@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('markups', function (Blueprint $table) {
             $table->id();
-            $table->date('start_date');
-            $table->date('end_date');
-            $table->integer('mark_up');
-            $table->integer('order_type');
-            $table->tinyInteger('status');
+            $table->date('start_date');    // The date when the markup starts
+            $table->date('end_date');      // The date when the markup ends
+            $table->integer('mark_up');    // Markup percentage or value
+            $table->integer('order_type'); // Type of order to apply the markup on
+            $table->tinyInteger('status')->default(0); // 0 for inactive, 1 for active status
             $table->timestamps();
         });
     }

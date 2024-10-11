@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('drivers', function (Blueprint $table) {
-            $table->tinyInteger('login_status')->default(0);
-            $table->string('login_location')->nullable();
+            $table->tinyInteger('login_status')->default(0); // Adding login status with default value 0
+            $table->string('login_location')->nullable();    // Adding login location as a nullable field
         });
     }
 
@@ -23,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('drivers', function (Blueprint $table) {
-            $table->dropColumn(['login_status', 'login_location']);
+            $table->dropColumn(['login_status', 'login_location']); // Dropping the added columns
         });
     }
 };

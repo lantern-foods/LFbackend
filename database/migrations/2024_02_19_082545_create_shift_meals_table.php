@@ -15,9 +15,16 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('shift_id');
             $table->unsignedBigInteger('meal_id');
+            $table->integer('quantity')->default(1)->comment = "Quantity of meals assigned for the shift"; // Added a quantity field
             $table->timestamps();
-            // Foreign key constraint
+
+            // Foreign key constraints
             $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('cascade');
+            $table->foreign('meal_id')->references('id')->on('meals')->onDelete('cascade');
+
+            // Indexing the foreign keys for optimization
+            $table->index('shift_id');
+            $table->index('meal_id');
         });
     }
 

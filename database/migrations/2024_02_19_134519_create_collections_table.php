@@ -16,8 +16,18 @@ return new class extends Migration
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('cook_id');
             $table->unsignedBigInteger('driver_id');
-            $table->string('status');
+            $table->string('status')->default('pending')->comment = "Status of the collection (e.g., pending, collected, delivered)";
             $table->timestamps();
+
+            // Foreign key constraints
+            $table->foreign('order_id')->references('id')->on('orders')->onDelete('cascade');
+            $table->foreign('cook_id')->references('id')->on('cooks')->onDelete('cascade');
+            $table->foreign('driver_id')->references('id')->on('drivers')->onDelete('cascade');
+
+            // Indexing the foreign keys for optimization
+            $table->index('order_id');
+            $table->index('cook_id');
+            $table->index('driver_id');
         });
     }
 

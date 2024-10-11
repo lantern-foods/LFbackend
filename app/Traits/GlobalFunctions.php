@@ -1,47 +1,22 @@
 <?php
+
 namespace App\Traits;
 
 trait GlobalFunctions
 {
-
+    /**
+     * Format a phone number to international format (Kenyan phone numbers).
+     */
     public function formatPhoneNumber($phone_no)
     {
-        $prefix = substr($phone_no, 0, 2);
-
-        if ($prefix == '07' || $prefix == '01') {
-
-            if ($prefix == '07') {
-                $str = $str = explode("7", $phone_no, 2);
-
-                if (!empty($str[1])) {
-                    if (strlen($str[1]) == 8) {
-                        $recipient = "2547" . $str[1];
-                        $resp = $recipient;
-                    } else {
-                        $resp = "Invalid"; //Invalid Phone number
-                    }
-                } else {
-                    $resp = "Invalid"; //Invalid Phone number
-                }
-            } else {
-                $str = $str = explode("1", $phone_no, 2);
-
-                if (!empty($str[1])) {
-                    if (strlen($str[1]) == 8) {
-                        $recipient = "2541" . $str[1];
-                        $resp = $recipient;
-                    } else {
-                        $resp = "Invalid"; //Invalid Phone number
-                    }
-                } else {
-                    $resp = "Invalid"; //Invalid Phone number
-                }
-            }
-
-        } else {
-            $resp = "Invalid"; //Invalid Phone number
+        // Validate the phone number prefix (should start with '07' or '01')
+        if (preg_match('/^(07|01)\d{8}$/', $phone_no)) {
+            $prefix = substr($phone_no, 0, 2);
+            $formatted_number = '254' . substr($phone_no, 1);
+            return $formatted_number;
         }
 
-        return $resp;
+        // If validation fails, return 'Invalid'
+        return 'Invalid';
     }
 }

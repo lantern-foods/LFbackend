@@ -6,39 +6,28 @@ use App\Models\Vehicle;
 
 trait Vehicles
 {
-
-    /***
-     * check whether license plate exits
-     * 
+    /**
+     * Check whether a license plate exists.
+     *
+     * @param string $licensePlate
+     * @return bool
      */
-    public function licensePlateExits($license_plate)
+    public function licensePlateExists(string $licensePlate): bool
     {
-        $flag = false;
-
-        $license_plate = Vehicle::where('license_plate',$license_plate)->count();
-
-        if ($license_plate > 0) {
-            
-            $flag = true;
-        }
-        return $flag;
+        return Vehicle::where('license_plate', $licensePlate)->exists();
     }
 
     /**
-     * check if license plate belongs to the vehicle
+     * Check if the given license plate belongs to the specified vehicle.
+     *
+     * @param int $vehicleId
+     * @param string $licensePlate
+     * @return bool
      */
-    public function licenseplateBelongsToVehicle($vehicle_id, $license_plate)
+    public function licensePlateBelongsToVehicle(int $vehicleId, string $licensePlate): bool
     {
-        $license_plate_belongs_to_vehicle=false;
-
-        $vehicle = Vehicle::where('id',$vehicle_id)->where('license_plate',$license_plate)->count();
-
-        if ($vehicle > 0) {
-            
-
-            $license_plate_belongs_to_vehicle = true;
-        }
-        return $license_plate_belongs_to_vehicle;
+        return Vehicle::where('id', $vehicleId)
+            ->where('license_plate', $licensePlate)
+            ->exists();
     }
-
 }

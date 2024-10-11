@@ -12,12 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('oauth_auth_codes', function (Blueprint $table) {
-            $table->string('id', 100)->primary();
-            $table->unsignedBigInteger('user_id')->index();
-            $table->uuid('client_id');
-            $table->text('scopes')->nullable();
-            $table->boolean('revoked');
-            $table->dateTime('expires_at')->nullable();
+            $table->string('id', 100)->primary(); // Primary key for auth code ID
+            $table->unsignedBigInteger('user_id')->index(); // Foreign key to users table
+            $table->uuid('client_id'); // Use UUID for clients as it represents the client app
+            $table->text('scopes')->nullable(); // Nullable since some tokens might not have scopes
+            $table->boolean('revoked'); // To check if the auth code is revoked
+            $table->dateTime('expires_at')->nullable(); // Expiry date for the auth code
+
+            // Add foreign key constraints, if necessary:
+            // $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            // $table->foreign('client_id')->references('id')->on('oauth_clients')->onDelete('cascade');
         });
     }
 

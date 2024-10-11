@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('shifts', function (Blueprint $table) {
-           if(!Schema::hasColumn('shifts','shift_status')){
+           if (!Schema::hasColumn('shifts', 'shift_status')) {
                  $table->tinyInteger('shift_status')->default(0);
             }
         });
@@ -24,7 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('shifts', function (Blueprint $table) {
-            $table->dropColumn('shift_status');
+            if (Schema::hasColumn('shifts', 'shift_status')) {
+                $table->dropColumn('shift_status');
+            }
         });
     }
 };

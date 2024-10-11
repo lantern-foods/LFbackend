@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('geofencing_areas', function (Blueprint $table) {
             $table->id();
-            $table->decimal('latitude', 10, 8);
-            $table->decimal('longitude', 11, 8);
-            $table->decimal('radius', 8, 2);
+            $table->decimal('latitude', 10, 8);   // Latitude of the center point of the geofencing area
+            $table->decimal('longitude', 11, 8);  // Longitude of the center point of the geofencing area
+            $table->decimal('radius', 8, 2);      // Radius of the geofence in meters
             $table->timestamps();
         });
     }

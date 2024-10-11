@@ -1,45 +1,35 @@
 <?php
-	namespace App\Traits;
+namespace App\Traits;
 
-	trait Numbers {
+trait Numbers
+{
+    /**
+     * Remove commas(,) from a monetary value.
+     *
+     * @param string $value
+     * @return string
+     */
+    public function cleanMonetaryValue(string $value): string
+    {
+        return str_replace(",", "", $value);
+    }
 
-		/**
-         * Remove commas(,) from amount
-         */
-        public function clean_monetary_value($value){
-        	
-            $new_value=  str_replace(",", "", $value);
-            
-            return $new_value;
+    /**
+     * Generate a unique random string of specified length.
+     *
+     * @param int $length
+     * @return string
+     */
+    public function generateRandomString(int $length): string
+    {
+        $chars = "abcdefghijkmnopqrstuvwxyz023456789";
+        $charLength = strlen($chars);
+        $randomStr = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $randomStr .= $chars[random_int(0, $charLength - 1)];
         }
 
-         /*
-         * Generate unique random string
-         *
-         * @return string
-         */
-        public function generaterandomString($length) {
-
-            $chars = "abcdefghijkmnopqrstuvwxyz023456789";
-
-            srand((double)microtime()*1000000);
-
-            $i = 0;
-
-            $randStr = '' ;
-
-            while ($i <= $length) {
-
-                $num = rand() % 33;
-
-                $tmp = substr($chars, $num, 1);
-
-                $randStr = $randStr . $tmp;
-
-                $i++;
-
-            }
-
-            return $randStr;
-        }    
-	}
+        return $randomStr;
+    }
+}

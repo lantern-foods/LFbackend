@@ -12,19 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('orders', function (Blueprint $table) {
-
             $table->id();
             $table->unsignedBigInteger('client_id');
-            $table->string('order_no')->unique();
-            $table->integer('order_type')->default(1)->comment="1-Express,2-Booked";
+            $table->string('order_no', 50)->unique(); // Limited to 50 characters
+            $table->integer('order_type')->default(1)->comment="1-Express, 2-Booked";
             $table->string('dt_req')->nullable()->comment="Delivery Time Requested";
-            $table->decimal('order_total',8,2);
-            $table->string('status');
-            $table->string('cook_dely_otp')->comment="Cook Delivery OTP";
-            $table->string('client_dely_otp')->comment="Client Delivery OTP";
+            $table->decimal('order_total', 10, 2); // Increased precision for larger orders
+            $table->string('status', 20); // Limit status length to 20 characters
+            $table->string('cook_dely_otp', 6)->comment="Cook Delivery OTP"; // Limited to 6 characters
+            $table->string('client_dely_otp', 6)->comment="Client Delivery OTP"; // Limited to 6 characters
             $table->timestamps();
 
-            $table->foreign('client_id')->references('id')->on('clients')->onUpdate('restrict')->onDelete('restrict');
+            // Foreign key with cascade options
+            $table->foreign('client_id')->references('id')->on('clients')->onUpdate('cascade')->onDelete('cascade');
         });
     }
 

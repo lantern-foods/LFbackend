@@ -19,6 +19,9 @@ return new class extends Migration
             $table->integer('delivery_directions')->nullable();
             $table->text('comment')->nullable();
             $table->timestamps();
+
+            // Add foreign key constraint for the order_id
+            $table->foreign('order_id')->references('id')->on('orders')->onDelete('cascade');
         });
     }
 

@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('roles', function (Blueprint $table) {
-            $table->tinyInteger('is_default')->default(0)->after('guard_name');
+            $table->tinyInteger('is_default')
+                ->default(0)
+                ->after('guard_name')
+                ->comment('Indicates if the role is a default system role');
         });
     }
 

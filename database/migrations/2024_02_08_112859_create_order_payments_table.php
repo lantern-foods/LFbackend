@@ -14,12 +14,16 @@ return new class extends Migration
         Schema::create('order_payments', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('order_id');
-            $table->decimal('amount',8,2);
+            $table->decimal('amount', 10, 2); // Increased precision
             $table->string('pmt_mthd')->comment="Payment Method";
             $table->string('pmt_ref')->comment="Payment Reference";
             $table->timestamps();
 
-            $table->foreign('order_id')->references('id')->on('orders')->onUpdate('restrict')->onDelete('restrict');
+            // Foreign key constraint with cascade
+            $table->foreign('order_id')->references('id')->on('orders')->onUpdate('cascade')->onDelete('cascade');
+
+            // Add an index for better query performance
+            $table->index('order_id');
         });
     }
 

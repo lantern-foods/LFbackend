@@ -13,11 +13,17 @@ return new class extends Migration
     {
         Schema::create('drivers_documents', function (Blueprint $table) {
             $table->id();
-            $table->integer('driver_id');
-            $table->string('profile_pic')->comment="Image of the Profile pic of the driver";
-            $table->string('id_front')->comment="Image of the Front face of the ID card";
-            $table->string('id_back')->comment="Image of the Back face of the ID card";
+            $table->unsignedBigInteger('driver_id');
+            $table->string('profile_pic')->comment = "Image of the Profile pic of the driver";
+            $table->string('id_front')->comment = "Image of the Front face of the ID card";
+            $table->string('id_back')->comment = "Image of the Back face of the ID card";
             $table->timestamps();
+
+            // Foreign key to drivers
+            $table->foreign('driver_id')->references('id')->on('drivers')->onUpdate('cascade')->onDelete('cascade');
+
+            // Indexing driver_id
+            $table->index('driver_id');
         });
     }
 

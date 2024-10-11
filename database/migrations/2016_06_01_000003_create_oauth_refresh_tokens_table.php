@@ -12,10 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('oauth_refresh_tokens', function (Blueprint $table) {
-            $table->string('id', 100)->primary();
-            $table->string('access_token_id', 100)->index();
-            $table->boolean('revoked');
-            $table->dateTime('expires_at')->nullable();
+            $table->string('id', 100)->primary(); // Primary key for refresh token ID
+            $table->string('access_token_id', 100)->index(); // Indexed access_token_id to relate to oauth_access_tokens
+            $table->boolean('revoked'); // Indicates if the refresh token is revoked
+            $table->dateTime('expires_at')->nullable(); // Expiration timestamp of the refresh token
+
+            // Optional: You can add a foreign key constraint to link to the access token
+            // $table->foreign('access_token_id')->references('id')->on('oauth_access_tokens')->onDelete('cascade');
         });
     }
 

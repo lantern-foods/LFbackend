@@ -13,6 +13,9 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             $table->unsignedBigInteger('customeraddress_id');
+
+            // If needed, you can also define a foreign key constraint like below:
+            // $table->foreign('customeraddress_id')->references('id')->on('customer_addresses')->onDelete('cascade');
         });
     }
 

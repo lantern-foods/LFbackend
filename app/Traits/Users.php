@@ -1,71 +1,54 @@
 <?php
-    namespace App\Traits;
 
-    use App\Models\User;
+namespace App\Traits;
 
-    trait Users {
+use App\Models\User;
 
-        /*
-        * Check whether email address exists
-        */
-        public function emailAddressExists($email)
-        {
-            $flag=false;
-
-            $email=User::where('email',$email)->count();
-
-            if($email>0){
-                $flag=true;
-            }
-
-            return $flag;
-        }
-
-        /*
-        * Check whether username exists
-        */
-        public function usernameExists($username)
-        {
-            $flag=false;
-
-            $username=User::where('username',$username)->count();
-
-            if($username>0){
-                $flag=true;
-            }
-
-            return $flag;
-        }
-
-        /*
-        * Check if email belongs to the user
-        */
-        public function emailBelongsToUser($user_id,$email)
-        {
-            $email_belongs_to_user=false;
-
-            $user=User::where('id',$user_id)->where('email',$email)->count();
-
-            if($user>0){
-                $email_belongs_to_user=true;
-            }
-
-            return $email_belongs_to_user;
-        }
-
-        /*
-        * Check if username belongs to the user
-        */
-        public function usernameBelongsToUser($user_id,$username)
-        {
-            $username_belongs_to_user=false;
-
-            $user=User::where('id',$user_id)->where('username',$username)->count();
-
-            if($user>0){
-                $username_belongs_to_user=true;
-            }
-
-            return $username_belongs_to_user;
-        }
+trait Users
+{
+    /**
+     * Check whether an email address exists in the system.
+     *
+     * @param string $email
+     * @return bool
+     */
+    public function emailAddressExists(string $email): bool
+    {
+        return User::where('email', $email)->exists();
     }
+
+    /**
+     * Check whether a username exists in the system.
+     *
+     * @param string $username
+     * @return bool
+     */
+    public function usernameExists(string $username): bool
+    {
+        return User::where('username', $username)->exists();
+    }
+
+    /**
+     * Check if the given email belongs to the specified user.
+     *
+     * @param int $userId
+     * @param string $email
+     * @return bool
+     */
+    public function emailBelongsToUser(int $userId, string $email): bool
+    {
+        return User::where('id', $userId)->where('email', $email)->exists();
+    }
+
+    /**
+     * Check if the given username belongs to the specified user.
+     *
+     * @param int $userId
+     * @param string $username
+     * @return bool
+     */
+    public function usernameBelongsToUser(int $userId, string $username): bool
+    {
+        return User::where('id', $userId)->where('username', $username)->exists();
+    }
+}

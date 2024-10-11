@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('failed_jobs', function (Blueprint $table) {
-            $table->id();
-            $table->string('uuid')->unique();
-            $table->text('connection');
-            $table->text('queue');
-            $table->longText('payload');
-            $table->longText('exception');
-            $table->timestamp('failed_at')->useCurrent();
+            $table->id(); // Auto-incrementing primary key
+            $table->string('uuid')->unique(); // Unique identifier for each failed job
+            $table->text('connection'); // The connection used by the job
+            $table->text('queue'); // The queue the job was pushed to
+            $table->longText('payload'); // The job payload that failed
+            $table->longText('exception'); // The exception that caused the failure
+            $table->timestamp('failed_at')->useCurrent(); // Timestamp when the job failed
         });
     }
 

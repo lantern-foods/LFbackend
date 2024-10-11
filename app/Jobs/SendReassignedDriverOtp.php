@@ -9,7 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use AfricasTalking\SDK\AfricasTalking;
-use App\Traits\GlobalFunctions;
+use Illuminate\Support\Facades\Log;
 
 class SendReassignedDriverOtp implements ShouldQueue
 {
@@ -17,10 +17,14 @@ class SendReassignedDriverOtp implements ShouldQueue
 
     protected $driver;
     protected $otp;
+
     /**
      * Create a new job instance.
+     *
+     * @param  Driver  $driver
+     * @param  string  $otp
      */
-    public function __construct(Driver $driver, $otp)
+    public function __construct(Driver $driver, string $otp)
     {
         $this->driver = $driver;
         $this->otp = $otp;
@@ -31,33 +35,67 @@ class SendReassignedDriverOtp implements ShouldQueue
      */
     public function handle(): void
     {
-        // Construct the message with OTP and terms
-        $message = "Dear " . $this->driver->driver_name . ", your reassignment OTP is: " . $this->otp . 
-                   ". Do not share your code. Read the terms and conditions.";
-
-        // Attempt to format the driver's phone number
+        // Construct the reassignment OTP message
+        $message = $this->buildMessage();
         $recipient = $this->formatPhoneNumber($this->driver->phone_number);
 
-        if ($recipient != 'Invalid' && strlen($recipient) == 12) {
-            $username = config('sms.africastalking.username'); // Ensure these are correctly set in your .env or config files
+        if ($this->isValidPhoneNumber($recipient)) {
+            $this->sendOtp($recipient, $message);
+        } else {
+            Log::error("Sending OTP: Invalid phone number " . $this->driver->phone_number);
+        }
+    }
+
+    /**
+     * Build the OTP message.
+     *
+     * @return string
+     */
+    private function buildMessage(): string
+    {
+        return "Dear " . $this->driver->driver_name . ", your reassignment OTP is: " . $this->otp .
+               ". Do not share your code. Read the terms and conditions.";
+    }
+
+    /**
+     * Validate the phone number format.
+     *
+     * @param  string  $phone_no
+     * @return bool
+     */
+    private function isValidPhoneNumber(string $phone_no): bool
+    {
+        return strlen($phone_no) === 12; // Validate phone number length (12 digits)
+    }
+
+    /**
+     * Send the OTP via Africa's Talking API.
+     *
+     * @param  string  $recipient
+     * @param  string  $message
+     * @return void
+     */
+    private function sendOtp(string $recipient, string $message): void
+    {
+        try {
+            $username = config('sms.africastalking.username'); // Ensure these are correctly set
             $apiKey = config('sms.africastalking.apiKey');
-            
-            // Initialize the AfricasTalking SDK
+            $from = "Br_Lantern"; // Sender ID
+
+            // Initialize the SDK
             $AT = new AfricasTalking($username, $apiKey);
             $sms = $AT->sms();
 
-            try {
-                // Attempt to send the SMS
-                $result = $sms->send([
-                    'to' => $recipient,
-                    'message' => $message,
-                    'from' => "Br_Lantern", // Your sender ID
-                ]);
-            } catch (\Exception $e) {
-                \Log::error("SMS Error: " . $e->getMessage());
-            }
-        } else {
-            \Log::error("Sending OTP: Invalid phone number " . $this->driver->phone_number);
+            // Send the SMS
+            $sms->send([
+                'to' => $recipient,
+                'message' => $message,
+                'from' => $from,
+            ]);
+
+            Log::info('Reassignment OTP sent to ' . $recipient);
+        } catch (\Exception $e) {
+            Log::error("SMS Error: " . $e->getMessage());
         }
     }
 }

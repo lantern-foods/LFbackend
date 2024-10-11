@@ -2,47 +2,34 @@
 
 namespace App\Traits;
 
-use DB;
+use Illuminate\Support\Facades\DB;
 
 trait Permissions
 {
     /**
-    * Returns an array of available permissions
-    */
-    public function permissions()
+     * Returns an array of all available permissions.
+     *
+     * @return array
+     */
+    public function permissions(): array
     {
-        $cook_permissions = [
-           'add-meal','edit-meal'
-        ];
+        $cookPermissions = ['add-meal', 'edit-meal'];
+        $clientPermissions = ['place-orders'];
+        $adminPermissions = ['apprv-cook-profile', 'apprv-meal', 'mng-users', 'mng-roles'];
 
-        $client_permissions=[
-            'place-orders'
-        ];
-
-        $administration_permissions = [
-            'apprv-cook-profile','apprv-meal','mng-users','mng-roles'
-        ];
-
-        $permissions=array_merge(
-            $cook_permissions,
-            $client_permissions,
-            $administration_permissions,
-        );
-
-        return $permissions;
+        return array_merge($cookPermissions, $clientPermissions, $adminPermissions);
     }
 
     /**
-    * Checks if permission exists before seeding
-    */
-    public function permissionExists($permission)
+     * Check if a permission exists in the database.
+     *
+     * @param string $permission
+     * @return bool
+     */
+    public function permissionExists(string $permission): bool
     {
-        $permission_exists = DB::table('permissions')->where('name', '=', $permission)->first();
-
-        if (!empty($permission_exists)) {
-            return true;
-        } else {
-            return false;
-        }
+        return DB::table('permissions')
+            ->where('name', $permission)
+            ->exists();
     }
 }

@@ -27,6 +27,9 @@ return new class extends Migration
             $table->boolean('approved')->default(false);
             $table->text('rejection_reason')->nullable();
             $table->timestamps();
+
+            // Foreign key constraint for cook_id
+            $table->foreign('cook_id')->references('id')->on('cooks')->onDelete('cascade');
         });
     }
 

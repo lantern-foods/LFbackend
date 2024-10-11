@@ -16,9 +16,10 @@ return new class extends Migration
             $table->unsignedBigInteger('client_id');
             $table->unsignedBigInteger('cook_id');
             $table->timestamps();
+
+            // Foreign key constraints
             $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
             $table->foreign('cook_id')->references('id')->on('cooks')->onDelete('cascade');
-           
         });
     }
 
