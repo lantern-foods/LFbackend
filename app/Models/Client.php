@@ -7,6 +7,7 @@ use Laravel\Passport\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
+
 class Client extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasRoles;
@@ -37,7 +38,7 @@ class Client extends Authenticatable
      */
     public function customerAddresses()
     {
-        return $this->hasMany(Customeraddress::class);
+        return $this->hasMany(CustomerAddress::class, 'client_id');
     }
 
     /**
@@ -51,5 +52,5 @@ class Client extends Authenticatable
      * Optionally disable timestamps if your table doesn't have `created_at` and `updated_at`.
      * Laravel assumes timestamps by default.
      */
-    public $timestamps = true;  // Set to false if your table doesn't have timestamps
+    public $timestamps = true;
 }

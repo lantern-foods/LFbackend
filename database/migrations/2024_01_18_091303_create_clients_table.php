@@ -18,9 +18,9 @@ return new class extends Migration {
             $table->string('password')->nullable(); // Password can be nullable (for social logins or similar cases)
 
             // Additional fields that are optional (nullable)
-            $table->string('google_map_pin')->nullable(); // Optional Google map location
-            $table->string('whatsapp_number')->nullable(); // Optional WhatsApp number
-            $table->string('physical_address')->nullable(); // Optional physical address
+           // $table->string('google_map_pin')->nullable(); // Optional Google map location
+            //$table->string('whatsapp_number')->nullable(); // Optional WhatsApp number
+           // $table->string('physical_address')->nullable(); // Optional physical address
 
             $table->string('client_otp')->nullable(); // OTP for verification
             $table->timestamps(); // Laravel's created_at and updated_at

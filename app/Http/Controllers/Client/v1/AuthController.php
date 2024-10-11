@@ -33,7 +33,7 @@ class AuthController extends Controller
 
         // Attempt authentication
         if (Auth::guard('clients')->attempt(['email_address' => $email, 'password' => $password])) {
-            $client = Auth::guard('clients')->user()->load('cook', 'customeraddress');
+            $client = Auth::guard('clients')->user()->load('cook', 'customerAddresses');
 
             // Generate access token
             $token = $client->createToken('Client Token')->accessToken;

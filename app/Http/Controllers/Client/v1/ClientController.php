@@ -7,9 +7,12 @@ use App\Models\Client;
 use App\Jobs\SendClientOtp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Traits\Clients;
 
 class ClientController extends Controller
 {
+    use Clients;
+
     /**
      * Display a listing of the clients.
      */
@@ -50,20 +53,11 @@ class ClientController extends Controller
         }
 
         $full_name = $request->input('full_name');
-        $phone_number = $request->input('phone_number');
+        $phone_number = $this->sanitizePhoneNumber($request->input('phone_number'));
         $email_address = $request->input('email_address');
 
-        // Check if the phone number is valid
-        list($msisdn, $network) = $this->get_msisdn_network($phone_number);
-        if (!$msisdn) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Please enter a valid phone number!',
-            ], 400);
-        }
-
         // Check for duplicate phone number
-        if ($this->phonenoExists($msisdn)) {
+        if ($this->phonenoExists($phone_number)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Phone number is already in use by another account!',
@@ -72,7 +66,7 @@ class ClientController extends Controller
 
         $client = Client::create([
             'full_name' => $full_name,
-            'phone_number' => $msisdn,
+            'phone_number' => $phone_number,
             'email_address' => $email_address,
         ]);
 
@@ -91,6 +85,30 @@ class ClientController extends Controller
             'status' => 'error',
             'message' => 'A problem occurred, account was not created. Please try again!',
         ], 500);
+    }
+
+    /**
+     * Sanitize phone number to remove special characters and normalize it to '254' format.
+     *
+     * @param string $phone_number
+     * @return string
+     */
+    private function sanitizePhoneNumber($phone_number)
+    {
+        // Remove all non-numeric characters
+        $cleaned_number = preg_replace('/\D/', '', $phone_number);
+
+        // If it starts with 07 or 01, replace with 254
+        if (preg_match('/^0[17]/', $cleaned_number)) {
+            $cleaned_number = preg_replace('/^0/', '254', $cleaned_number);
+        }
+
+        // Ensure it starts with 254
+        if (!preg_match('/^254/', $cleaned_number)) {
+            return ''; // Invalid format
+        }
+
+        return $cleaned_number;
     }
 
     /**
@@ -164,7 +182,7 @@ class ClientController extends Controller
         $client->update([
             'full_name' => $request->input('full_name'),
             'email_address' => $request->input('email_address'),
-            'phone_number' => $request->input('phone_number'),
+            'phone_number' => $this->sanitizePhoneNumber($request->input('phone_number')),
             'whatsapp_number' => $request->input('whatsapp_number'),
             'physical_address' => $request->input('physical_address'),
         ]);
