@@ -3,7 +3,7 @@
 namespace App\Traits;
 
 use App\Models\Cart;
-use App\Models\Customeraddress;
+use App\Models\CustomerAddress;
 use App\Models\Meal;
 use App\Models\Order;
 use App\Models\Package;
