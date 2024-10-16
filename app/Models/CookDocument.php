@@ -9,7 +9,7 @@ class CookDocument extends Model
 {
     use HasFactory;
 
-    protected $table = 'cook_documents';  // Ensure this matches your database table name
+    protected $table = 'cooks_documents';  // Ensure this matches your database table name
 
     protected $fillable = [
         'cook_id',

@@ -84,7 +84,14 @@ class CookController extends Controller
             ], 400);
         }
 
+        // Validate the Mpesa number
         list($msisdn, $network) = $this->get_msisdn_network($validated['mpesa_number']);
+        if (!$msisdn) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid Mpesa number. Please provide a valid Kenyan phone number!',
+            ], 400);
+        }
 
         $cook = Cook::create([
             'client_id' => $validated['client_id'],
@@ -262,5 +269,29 @@ class CookController extends Controller
         Storage::disk('s3')->put($path, $fileContents, 'public');
 
         return Storage::disk('s3')->url($path);
+    }
+
+    /**
+     * Helper method to validate and return the network for a given phone number (msisdn).
+     */
+    public function get_msisdn_network($msisdn)
+    {
+        // Define regex for different Kenyan networks
+        $regex = [
+            'airtel'     => '/^\+?(254|0|)7(?:[38]\d{7}|5[0-6]\d{6})\b/',
+            'equitel'    => '/^\+?(254|0|)76[0-7]\d{6}\b/',
+            'safaricom'  => '/^\+?(254|0|)(?:7[01249]\d{7}|1[01234]\d{7}|75[789]\d{6}|76[89]\d{6})\b/',
+            'telkom'     => '/^\+?(254|0|)7[7]\d{7}\b/',
+        ];
+
+        // Match phone number against the patterns
+        foreach ($regex as $operator => $re) {
+            if (preg_match($re, $msisdn)) {
+                // Normalize the phone number to 254 format
+                return [preg_replace('/^\+?(254|0)/', '254', $msisdn), $operator];
+            }
+        }
+
+        return [false, false];
     }
 }

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Checkout\v1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cart;
-use App\Models\Customeraddress;
+use App\Models\CustomerAddress;
 use App\Models\Meal;
 use App\Models\Package;
 use App\Traits\Numbers;
@@ -263,14 +263,17 @@ class ShoppingCartController extends Controller
             ->where('selected', 0)
             ->get();
 
-        $active_address = Customeraddress::where('location_status', 1)
+        $active_address = CustomerAddress::where('location_status', 1)
             ->where('client_id', $client_id)
             ->first();
+
+        // Replace computeCartTotal with appropriate method
+        $total = $isExpress ? $this->computeExpressSelectedCartTotal() : $this->computeBookedSelectedCartTotal();
 
         if ($meals->isEmpty() && $packages->isEmpty()) {
             return response()->json([
                 'status' => 'no_data',
-                'total' => $this->computeCartTotal(),
+                'total' => $total,
                 'message' => 'Your cart is empty!',
             ], 404);
         }
@@ -278,7 +281,7 @@ class ShoppingCartController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Request successful!',
-            'total' => $this->computeCartTotal(),
+            'total' => $total,
             'delivery_cost' => 0,
             'address' => $active_address,
             'meals' => $meals,
