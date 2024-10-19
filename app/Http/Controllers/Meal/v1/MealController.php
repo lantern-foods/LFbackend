@@ -28,7 +28,7 @@ class MealController extends Controller
     {
         $clientId = Auth::user()->id;
 
-        $meals = Meal::with('cook', 'meals_images')
+        $meals = Meal::with('cook', 'mealImages') // Corrected relationship name
             ->where('express_status', 1)
             ->get()
             ->map(function ($meal) use ($clientId) {
@@ -39,7 +39,7 @@ class MealController extends Controller
                 return $meal;
             });
 
-        $packages = Package::with('packageMeals.meal.meal_images')
+        $packages = Package::with('packageMeals.meal.mealImages') // Corrected relationship name
             ->where('express_status', 1)
             ->get()
             ->each(function ($package) {
@@ -68,7 +68,7 @@ class MealController extends Controller
     {
         $clientId = Auth::user()->id;
 
-        $meals = Meal::with('cook', 'meal_images')
+        $meals = Meal::with('cook', 'mealImages') // Corrected relationship name
             ->get()
             ->map(function ($meal) use ($clientId) {
                 $meal->favorites_count = $meal->favorites_count ?? 0;
@@ -81,7 +81,7 @@ class MealController extends Controller
                 return $meal;
             });
 
-        $packages = Package::with('packageMeals.meal.meal_images')->get();
+        $packages = Package::with('packageMeals.meal.mealImages')->get(); // Corrected relationship name
 
         if (!$meals->isEmpty() || !$packages->isEmpty()) {
             return response()->json([
@@ -105,7 +105,7 @@ class MealController extends Controller
     {
         $clientId = Auth::user()->id;
 
-        $meal = Meal::with('cook', 'meals_images')
+        $meal = Meal::with('cook', 'mealImages') // Corrected relationship name
             ->where('id', $id)
             ->get()
             ->map(function ($meal) use ($clientId) {
@@ -136,7 +136,7 @@ class MealController extends Controller
     {
         $clientId = Auth::user()->id;
 
-        $meal = Meal::with('cook', 'meals_images')
+        $meal = Meal::with('cook', 'mealImages') // Corrected relationship name
             ->where('id', $id)
             ->get()
             ->map(function ($meal) use ($clientId) {
@@ -165,7 +165,9 @@ class MealController extends Controller
      */
     public function cook_meals(string $id)
     {
-        $cook_meals = Meal::with('meal_images')->where('cook_id', $id)->get();
+        $cook_meals = Meal::with('mealImages') // Corrected relationship name
+            ->where('cook_id', $id)
+            ->get();
 
         if (!$cook_meals->isEmpty()) {
             return response()->json([
@@ -215,6 +217,15 @@ class MealController extends Controller
         $savedImageUrls = [];
 
         foreach ($request->file('image_url') as $image) {
+            // Validate that the image is not a GIF
+            if ($image->getClientOriginalExtension() === 'gif') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'GIF images are not allowed. Please upload other image formats.',
+                ], 400);
+            }
+
+            // Process the image upload
             $filePath = $this->processImageUpload($image);
 
             if ($filePath) {
@@ -224,7 +235,7 @@ class MealController extends Controller
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Meal images were not uploaded. Please try again!',
-                ]);
+                ], 500);
             }
         }
 
@@ -236,21 +247,32 @@ class MealController extends Controller
 
     /**
      * Process image upload to S3 and return file path.
+     *
+     * Allow all image types except GIF and resize the image while maintaining quality.
      */
     private function processImageUpload($image)
     {
-        $img = Image::make($image->getRealPath())->resize(882, 484);
-        $resizedImageData = $img->encode('png');
+        // Get the original extension of the uploaded file
+        $extension = $image->getClientOriginalExtension();
 
-        $uniqueFileName = time() . '_' . Str::random(10) . '.png';
+        // Supported image types except GIF
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'bmp', 'webp'];
+
+        // Validate if the image type is allowed
+        if (!in_array($extension, $allowedExtensions)) {
+            return false; // Invalid image type
+        }
+
+        // No need to resize the image, just process the upload and store in S3
+        $uniqueFileName = time() . '_' . Str::random(10) . '.' . $extension;
         $filePath = 'meals/' . $uniqueFileName;
 
-        return $this->uploadToS3($filePath, $resizedImageData) ? $this->getImageS3Url($filePath) : false;
+        return $this->uploadToS3($filePath, file_get_contents($image)) ? $this->getImageS3Url($filePath) : false;
     }
 
     private function uploadToS3($filePath, $imageData)
     {
-        return Storage::disk('s3')->put($filePath, $imageData);
+        return Storage::disk('s3')->put($filePath, $imageData, 'public');
     }
 
     private function getImageS3Url($filePath)
