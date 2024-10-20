@@ -12,7 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Schedule the shifts:auto-end command to run every minute
+        $schedule->command('shifts:auto-end')->everyMinute();
     }
 
     /**
