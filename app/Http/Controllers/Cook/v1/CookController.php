@@ -45,7 +45,7 @@ class CookController extends Controller
      */
     public function all_cook_meals()
     {
-        $allcook_meals = Cook::with('meals.meal_images')->get();
+        $allcook_meals = Cook::with('meals.mealImages')->get();
 
         return $this->generateResponse($allcook_meals, 'Meals');
     }
@@ -55,7 +55,7 @@ class CookController extends Controller
      */
     public function all_cook_meals_express()
     {
-        $allcook_meals = Cook::with('meals.meal_images')->get();
+        $allcook_meals = Cook::with('meals.mealImages')->get();
 
         return $this->generateResponse($allcook_meals, 'Express Meals');
     }
@@ -65,7 +65,7 @@ class CookController extends Controller
      */
     public function all_cook_meal(string $id)
     {
-        $allcook_meal = Cook::with(['shifts', 'meals.meal_images'])->find($id);
+        $allcook_meal = Cook::with(['shifts', 'meals.mealImages'])->find($id);
 
         return $this->generateResponse($allcook_meal, 'Cook Meals');
     }
