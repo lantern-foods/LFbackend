@@ -23,7 +23,7 @@ class PackageController extends Controller
      */
     public function index()
     {
-        $packages = Package::with('packageMeals.meal.meal_images')->get();
+        $packages = Package::with('packageMeals.meal.mealImages')->get();
 
         foreach ($packages as $package) {
             $shift_package = ShiftPackage::where('package_id', $package->id)->first();
@@ -162,7 +162,7 @@ class PackageController extends Controller
      */
     public function show(string $id)
     {
-        $package = Package::with('packageMeals.meal.meal_images')->find($id);
+        $package = Package::with('packageMeals.meal.mealImages')->find($id);
 
         if ($package) {
             return response()->json([

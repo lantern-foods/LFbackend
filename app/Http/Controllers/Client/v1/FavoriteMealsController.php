@@ -56,7 +56,7 @@ class FavoriteMealsController extends Controller
     public function index()
     {
         $client_id = Auth::id();
-        $favorite_meals = FavoriteMeal::with('meal.meal_images')
+        $favorite_meals = FavoriteMeal::with('meal.mealImages')
             ->where('client_id', $client_id)
             ->get();
 

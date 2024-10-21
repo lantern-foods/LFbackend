@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Meal;
 use App\Models\MealImage;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class MealApprovalController extends Controller
 {
@@ -14,25 +15,26 @@ class MealApprovalController extends Controller
      */
     public function edit(string $id)
     {
-        $meal = Meal::find($id);
-
-        if ($meal) {
-            $mealImages = MealImage::where('meal_id', $id)->get();
+        try {
+            // Find the meal with its associated images
+            $meal = Meal::with('mealImages')->findOrFail($id);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Request successful!',
-                'data' => [
-                    'meal' => $meal,
-                    'meal_images' => $mealImages,
-                ],
+                'data' => $meal,
             ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'no_data',
+                'message' => 'Meal record not found!',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred. Please try again!',
+            ], 500);
         }
-
-        return response()->json([
-            'status' => 'no_data',
-            'message' => 'Meal record not found!',
-        ], 404);
     }
 
     /**
@@ -42,9 +44,10 @@ class MealApprovalController extends Controller
     {
         // Validate request input
         $request->validate([
-            'status' => 'required|string',
+            'status' => 'required|string|in:approved,rejected,pending',
         ], [
             'status.required' => 'Approval status is required',
+            'status.in' => 'The provided status is invalid',
         ]);
 
         try {
@@ -60,6 +63,11 @@ class MealApprovalController extends Controller
                 'status' => 'success',
                 'message' => 'Meal status updated successfully!',
             ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'no_data',
+                'message' => 'Meal record not found!',
+            ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -87,6 +95,11 @@ class MealApprovalController extends Controller
                 'status' => 'success',
                 'message' => 'Meal deleted successfully!',
             ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'no_data',
+                'message' => 'Meal record not found!',
+            ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',

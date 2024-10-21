@@ -58,7 +58,7 @@ class ClientFavoriteController extends Controller
         $client_id = Auth::id();
 
         $favourite_meals = FavoriteMeal::where('client_id', $client_id)
-            ->with('meal.meal_images')
+            ->with('meal.mealImages')
             ->get();
 
         return response()->json([
