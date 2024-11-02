@@ -200,7 +200,7 @@ trait Orders
         $order_no = strtoupper($this->generateRandomString(11));
         $delivery_date = Carbon::parse($request->input('delivery_date'))->format('d-m-Y');
         $delivery_time = $request->input('delivery_time');
-        $customer_address = $request->input('address_id') ?? Customeraddress::where('client_id', $client_id)->value('id');
+        $customer_address = $request->input('address_id') ?? CustomerAddress::where('client_id', $client_id)->value('id');
         $time_requested = $delivery_date . ' ' . $delivery_time;
         $order_total = $type === 'express' ? $this->computeExpressSelectedCartTotal() : $this->computeBookedSelectedCartTotal();
         $cook_dely_otp = mt_rand(100000, 999999);

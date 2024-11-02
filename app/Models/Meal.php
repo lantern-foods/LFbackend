@@ -75,8 +75,6 @@ class Meal extends Model
 
     /**
      * Get the attribute for the number of favorites.
-     * Use the 'favoritesCount' relationship if it's already loaded,
-     * otherwise, load it and calculate the count.
      */
     public function getFavoritesCountAttribute()
     {
@@ -89,8 +87,6 @@ class Meal extends Model
 
     /**
      * Check if a meal is liked by a specific client.
-     * @param int $client_id
-     * @return bool
      */
     public function isLikedBy($client_id)
     {
