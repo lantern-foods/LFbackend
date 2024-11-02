@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Client\v1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Customeraddress;
+use App\Models\CustomerAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
