@@ -34,6 +34,26 @@ class ShiftController extends Controller
     }
 
     /**
+     * Get all shifts with their meals for the authenticated cook.
+     */
+    public function allShiftsmeals()
+    {
+        $shifts = Shift::where('cook_id', Auth::id())->get();
+
+        foreach ($shifts as $shift) {
+            $shift->meals = Shiftmeal::join('meals', 'shift_meals.meal_id', '=', 'meals.id')
+                ->where('shift_id', $shift->id)
+                ->get();
+        }
+
+        return response()->json([
+            'status' => !$shifts->isEmpty() ? 'success' : 'no_data',
+            'message' => !$shifts->isEmpty() ? 'Request successful' : 'No records found',
+            'data' => $shifts,
+        ]);
+    }
+
+    /**
      * Get shifts for a specific cook.
      */
     public function getShift($cookId)
@@ -62,10 +82,21 @@ class ShiftController extends Controller
         $cookId = $request->input('cook_id');
         $meals = $request->input('meals', []);
         $packages = $request->input('packages', []);
+        $startTime = Carbon::parse($request->input('start_time'));
+        $endTime = Carbon::parse($request->input('end_time'));
 
-        // Validate presence of meals or packages
-        if (empty($meals) && empty($packages)) {
-            return response()->json(['error' => 'At least one meal or package is required.'], 400);
+        // Validate presence of meals or packages with a quantity greater than 0
+        if (!$this->validateMealsAndPackages($meals, $packages)) {
+            return response()->json(['error' => 'Select at least one meal or package with a target greater than 0.'], 400);
+        }
+
+        // Ensure shift does not start before the defined start time
+        $currentTime = Carbon::now();
+        if ($currentTime->lt($startTime)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Shift cannot start before the defined start time.',
+            ], 400);
         }
 
         // Create shift
@@ -74,18 +105,17 @@ class ShiftController extends Controller
             'start_time' => $request->input('start_time'),
             'end_time' => $request->input('end_time'),
             'shift_date' => $request->input('shift_date'),
-            'estimated_revenue' => $request->input('estimated_revenue'),
-            'shift_status' => 1,
+            'estimated_revenue' => 0, // Initial revenue
+            'shift_status' => 1, // Active shift
         ]);
 
         if ($shift) {
             $this->attachMeals($shift, $meals);
             $this->attachPackages($shift, $packages);
-            $this->startShiftAction($shift->id);
             $this->computeEstimateShiftRevenue($shift->id);
 
-            $adminControl = ShiftAdminControll::first();
-            $message = $shift ? 'Shift created successfully.' : 'Shift created but not started. Standard start time is ' . $adminControl->shift_start_time;
+            $adminControl = ShiftAdminControll::first(); // Ensure this table exists
+            $message = 'Shift created successfully.';
 
             return response()->json([
                 'status' => 'success',
@@ -101,25 +131,48 @@ class ShiftController extends Controller
     }
 
     /**
-     * Edit an existing shift.
+     * Auto-end shifts based on end time.
+     * This function should be called on a schedule (e.g., via a cron job or scheduler).
      */
-    public function editShift(string $id)
+    public function autoEndShifts()
     {
-        $shift = Shift::find($id);
+        $currentTime = Carbon::now();
 
+        // Find all active shifts that have passed their end time
+        $shiftsToEnd = Shift::where('shift_status', 1) // Active shifts
+                            ->where('end_time', '<=', $currentTime) // End time has passed
+                            ->get();
+
+        foreach ($shiftsToEnd as $shift) {
+            $this->endShiftAction($shift->id);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Checked and ended all shifts past their end time.',
+        ]);
+    }
+
+    /**
+     * Manually end a shift.
+     */
+    public function endShiftAction($shiftId)
+    {
+        $shift = Shift::find($shiftId);
         if ($shift) {
-            $shift_meal = Shiftmeal::join('meals', 'shift_meals.meal_id', '=', 'meals.id')->where('shift_id', $id)->get();
+            $shift->shift_status = 0; // End the shift
+            $shift->save();
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Request successful!',
-                'data' => [$shift, $shift_meal],
+                'message' => 'Shift ended successfully.',
             ]);
         }
 
         return response()->json([
-            'status' => 'no_data',
-            'message' => 'Unable to load shift. Please try again!',
-        ]);
+            'status' => 'error',
+            'message' => 'Shift not found.',
+        ], 404);
     }
 
     /**
@@ -134,15 +187,22 @@ class ShiftController extends Controller
 
         $request->validated();
 
+        $meals = $request->input('meals', []);
+        $packages = $request->input('packages', []);
+
+        // Validate presence of meals or packages with a quantity greater than 0
+        if (!$this->validateMealsAndPackages($meals, $packages)) {
+            return response()->json(['error' => 'Select at least one meal or package with a target greater than 0.'], 400);
+        }
+
         $shift->update([
             'end_time' => $request->input('end_time'),
             'shift_date' => $request->input('shift_date'),
-            'shift_status' => 1,
+            'shift_status' => 1, // Mark as active
         ]);
 
-        $this->attachMeals($shift, $request->input('meals', []));
-        $this->attachPackages($shift, $request->input('packages', []));
-        $this->startShiftAction($shift->id);
+        $this->attachMeals($shift, $meals);
+        $this->attachPackages($shift, $packages);
         $this->computeEstimateShiftRevenue($shift->id);
 
         return response()->json([
@@ -153,26 +213,23 @@ class ShiftController extends Controller
     }
 
     /**
-     * End an existing shift.
+     * Validate that at least one meal or package is selected with a target (quantity) greater than 0.
      */
-    public function updateShiftstatus($id)
+    private function validateMealsAndPackages($meals, $packages)
     {
-        $shift = Shift::find($id);
-        if (!$shift) {
-            return response()->json(['error' => 'Shift not found'], 404);
+        foreach ($meals as $meal) {
+            if (isset($meal['quantity']) && $meal['quantity'] > 0) {
+                return true;
+            }
         }
 
-        if ($this->endShiftAction($shift->id)) {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Shift ended successfully.',
-            ]);
+        foreach ($packages as $package) {
+            if (isset($package['quantity']) && $package['quantity'] > 0) {
+                return true;
+            }
         }
 
-        return response()->json([
-            'status' => 'error',
-            'message' => 'A problem was encountered, shift was NOT ended. Please try again!',
-        ]);
+        return false;
     }
 
     /**
@@ -255,5 +312,32 @@ class ShiftController extends Controller
                 'quantity' => $package['quantity'],
             ]);
         }
+    }
+
+    /**
+     * Calculate the estimated revenue for the shift based on meals and packages.
+     */
+    protected function computeEstimateShiftRevenue($shiftId)
+    {
+        $shift = Shift::find($shiftId);
+        $estimatedRevenue = 0;
+
+        // Calculate estimated revenue from meals
+        $meals = Shiftmeal::where('shift_id', $shiftId)->get();
+        foreach ($meals as $meal) {
+            $mealPrice = Meal::where('id', $meal->meal_id)->value('meal_price');
+            $estimatedRevenue += $meal->quantity * $mealPrice;
+        }
+
+        // Calculate estimated revenue from packages
+        $packages = ShiftPackage::where('shift_id', $shiftId)->get();
+        foreach ($packages as $package) {
+            $packagePrice = Package::where('id', $package->package_id)->value('package_price');
+            $estimatedRevenue += $package->quantity * $packagePrice;
+        }
+
+        // Update shift with the calculated estimated revenue
+        $shift->estimated_revenue = $estimatedRevenue;
+        $shift->save();
     }
 }
