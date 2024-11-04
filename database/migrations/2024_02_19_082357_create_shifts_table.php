@@ -18,7 +18,7 @@ return new class extends Migration
             $table->time('start_time')->nullable()->comment = "Shift start time"; // Nullable to handle cases where it's not defined initially
             $table->time('end_time')->nullable()->comment = "Shift end time";   // Nullable to handle cases where it's not defined initially
             $table->date('shift_date')->comment = "Date of the shift";
-            $table->tinyInteger('shift_status')->default(1)->comment = "1-active shift, 2-closed shift"; // Default to active shift
+            $table->tinyInteger('shift_status')->default(0)->comment = "0-scheduled shift, 1-active shift, 2-closed shift"; // Default to scheduled shift
             $table->timestamps();
 
             // Foreign key constraint with cascade delete to remove associated shifts if a cook is deleted

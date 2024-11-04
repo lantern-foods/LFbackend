@@ -12,7 +12,8 @@ use App\Models\Packagedetail;
 use App\Models\PackageMeal;
 use App\Models\ShiftPackage;
 use App\Traits\Cooks;
-use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Response;
 
 class PackageController extends Controller
 {
@@ -42,8 +43,8 @@ class PackageController extends Controller
      */
     public function create(PackageRequest $request)
     {
-        $request->validated();
-        $cook = Cook::find($request->input('cook_id'));
+        $request->validate();
+        $cook = Cook::findOrFail($request->input('cook_id'));
 
         if (!$cook) {
             return response()->json([
@@ -73,7 +74,6 @@ class PackageController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Package created successfully',
             'package' => Package::with('packageMeals.meal')->find($package->id),
         ]);
     }

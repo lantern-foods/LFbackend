@@ -92,12 +92,7 @@ class ShiftController extends Controller
 
         // Ensure shift does not start before the defined start time
         $currentTime = Carbon::now();
-        if ($currentTime->lt($startTime)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Shift cannot start before the defined start time.',
-            ], 400);
-        }
+        $shiftStatus = $currentTime->lt($startTime) ? 0 : 1; // Scheduled if start time is in the future, otherwise active
 
         // Create shift
         $shift = Shift::create([
@@ -106,7 +101,7 @@ class ShiftController extends Controller
             'end_time' => $request->input('end_time'),
             'shift_date' => $request->input('shift_date'),
             'estimated_revenue' => 0, // Initial revenue
-            'shift_status' => 1, // Active shift
+            'shift_status' => $shiftStatus, // Scheduled or active
         ]);
 
         if ($shift) {
@@ -127,6 +122,67 @@ class ShiftController extends Controller
         return response()->json([
             'status' => 'error',
             'message' => 'A problem was encountered, shift was NOT created. Please try again!',
+        ]);
+    }
+
+    /**
+     * Auto-start shifts based on start time.
+     * This function should be called on a schedule (e.g., via a cron job or scheduler).
+     */
+    public function autoStartShifts()
+    {
+        $currentTime = Carbon::now();
+
+        // Find all scheduled shifts that have reached their start time
+        $shiftsToStart = Shift::where('shift_status', 0) // Scheduled shifts
+                              ->where('start_time', '<=', $currentTime) // Start time has arrived
+                              ->get();
+
+        foreach ($shiftsToStart as $shift) {
+            $shift->shift_status = 1; // Start the shift
+            $shift->save();
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Checked and started all shifts that have reached their start time.',
+        ]);
+    }
+
+    /**
+     * Manually start a shift.
+     */
+    public function startShiftAction($shiftId)
+    {
+        $shift = Shift::find($shiftId);
+        if (!$shift) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Shift not found.',
+            ], 404);
+        }
+
+        $currentTime = Carbon::now();
+        $startTime = Carbon::parse($shift->start_time);
+
+        if ($currentTime->lt($startTime)) {
+            // Schedule the shift to start at the specified start time
+            $shift->shift_status = 0; // Scheduled
+            $shift->save();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Shift scheduled to start at the defined start time.',
+            ]);
+        }
+
+        // Start the shift immediately
+        $shift->shift_status = 1; // Active
+        $shift->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Shift started successfully.',
         ]);
     }
 
@@ -160,7 +216,7 @@ class ShiftController extends Controller
     {
         $shift = Shift::find($shiftId);
         if ($shift) {
-            $shift->shift_status = 0; // End the shift
+            $shift->shift_status = 2; // End the shift
             $shift->save();
 
             return response()->json([
