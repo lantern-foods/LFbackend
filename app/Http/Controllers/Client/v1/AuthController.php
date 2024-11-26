@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Client\v1;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
@@ -14,6 +14,7 @@ class AuthController extends Controller
     public function authenticate(Request $request)
     {
         $email = $request->input('email');
+
         $password = $request->input('password');
 
         // Validate required fields
@@ -33,7 +34,9 @@ class AuthController extends Controller
 
         // Attempt authentication
         if (Auth::guard('clients')->attempt(['email_address' => $email, 'password' => $password])) {
-            $client = Auth::guard('clients')->user()->load('cook', 'customerAddresses');
+            // $client = Auth::guard('clients')->user()->load(['cook', 'customerAddresses']);
+
+            $client = Auth::guard('clients')->user();
 
             // Generate access token
             $token = $client->createToken('Client Token')->accessToken;

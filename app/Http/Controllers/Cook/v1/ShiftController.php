@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Cook\v1;
 
+use App\Http\Controllers\Admin\ShiftAdminController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ShiftRequest;
 use App\Http\Requests\ShiftUpddatRequest;
@@ -82,7 +83,9 @@ class ShiftController extends Controller
         $cookId = $request->input('cook_id');
         $meals = $request->input('meals', []);
         $packages = $request->input('packages', []);
-        $startTime = Carbon::parse($request->input('start_time'));
+        // $startTime = Carbon::parse($request->input('start_time'));
+        $startTime = now();
+
         $endTime = Carbon::parse($request->input('end_time'));
 
         // Validate presence of meals or packages with a quantity greater than 0
@@ -109,7 +112,7 @@ class ShiftController extends Controller
             $this->attachPackages($shift, $packages);
             $this->computeEstimateShiftRevenue($shift->id);
 
-            $adminControl = ShiftAdminControll::first(); // Ensure this table exists
+            $adminControl = ShiftAdminController::first(); // Ensure this table exists
             $message = 'Shift created successfully.';
 
             return response()->json([
@@ -118,6 +121,8 @@ class ShiftController extends Controller
                 'data' => $this->getShiftDetails($shift->id),
             ]);
         }
+
+        // TODO: Implement websockets
 
         return response()->json([
             'status' => 'error',
@@ -135,8 +140,8 @@ class ShiftController extends Controller
 
         // Find all scheduled shifts that have reached their start time
         $shiftsToStart = Shift::where('shift_status', 0) // Scheduled shifts
-                              ->where('start_time', '<=', $currentTime) // Start time has arrived
-                              ->get();
+            ->where('start_time', '<=', $currentTime) // Start time has arrived
+            ->get();
 
         foreach ($shiftsToStart as $shift) {
             $shift->shift_status = 1; // Start the shift
@@ -196,8 +201,8 @@ class ShiftController extends Controller
 
         // Find all active shifts that have passed their end time
         $shiftsToEnd = Shift::where('shift_status', 1) // Active shifts
-                            ->where('end_time', '<=', $currentTime) // End time has passed
-                            ->get();
+            ->where('end_time', '<=', $currentTime) // End time has passed
+            ->get();
 
         foreach ($shiftsToEnd as $shift) {
             $this->endShiftAction($shift->id);

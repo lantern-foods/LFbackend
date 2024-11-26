@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers\Cook\v1;
 
+use App\Models\Cook;
+use App\Traits\Cooks;
+use App\Traits\Clients;
+use App\Models\CookDocument;
+use App\Http\Requests\CookRequest;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Requests\CookDocumentRequest;
 use App\Http\Requests\CookProfileEditRequest;
-use App\Http\Requests\CookRequest;
-use App\Models\Cook;
-use App\Models\CookDocument;
-use App\Traits\Clients;
-use App\Traits\Cooks;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManagerStatic as Image;
 
 class CookController extends Controller
