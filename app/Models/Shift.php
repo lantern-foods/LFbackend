@@ -39,6 +39,10 @@ class Shift extends Model
         return $this->hasMany(Shiftmeal::class);
     }
 
+    public function packages()
+    {
+        return $this->hasMany(ShiftPackage::class);
+    }
     /**
      * Define the relationship between Shift and OrderDetail
      */

@@ -36,11 +36,12 @@ class MealController extends Controller
                 $meal->is_liked = $meal->isLikedBy($clientId);
                 $meal_rating = MealPackageRating::where('meal_id', $meal->id)->get();
                 $meal->shift_id = Shiftmeal::where('meal_id', $meal->id)->value('shift_id');
+
                 return $meal;
             });
 
         $packages = Package::with('packageMeals.meal.mealImages') // Corrected relationship name
-            ->where('express_status', 1)
+            ->where('express_status', 0)
             ->get()
             ->each(function ($package) {
                 $package->shift_id = ShiftPackage::where('package_id', $package->id)->value('shift_id');

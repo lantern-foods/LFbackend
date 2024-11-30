@@ -17,6 +17,14 @@ class ShiftMeal extends Model
         'quantity'
     ];
 
+
+    public static function booted()
+    {
+        static::creating(function ($model) {
+            $model->meal->update(['express_status' => 1]);
+        });
+    }
+
     // Disable timestamps if your table does not have created_at and updated_at columns
     public $timestamps = false;
 

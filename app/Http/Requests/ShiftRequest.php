@@ -22,11 +22,11 @@ class ShiftRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'cook_id' => 'required|integer|exists:cooks,id',
-            'estimated_revenue' => 'required|numeric|min:0',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-            'shift_date' => 'required|date',
+            // 'cook_id' => 'integer|exists:cooks,id',
+            'estimated_revenue' => 'numeric|min:0',
+            'start_time' => 'date_format:H:i',
+            'end_time' => 'date_format:H:i|after:start_time',
+            'shift_date' => 'date',
         ];
     }
 

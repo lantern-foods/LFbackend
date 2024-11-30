@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ShiftController extends Controller
 {
@@ -80,10 +81,11 @@ class ShiftController extends Controller
     public function store(ShiftRequest $request)
     {
         $request->validated();
-        $cookId = $request->input('cook_id');
+
+        // $cookId = $request->input('cook_id');
         $meals = $request->input('meals', []);
         $packages = $request->input('packages', []);
-        // $startTime = Carbon::parse($request->input('start_time'));
+        $startTime = Carbon::parse($request->input('start_time'));
         $startTime = now();
 
         $endTime = Carbon::parse($request->input('end_time'));
@@ -95,11 +97,12 @@ class ShiftController extends Controller
 
         // Ensure shift does not start before the defined start time
         $currentTime = Carbon::now();
+
         $shiftStatus = $currentTime->lt($startTime) ? 0 : 1; // Scheduled if start time is in the future, otherwise active
 
         // Create shift
         $shift = Shift::create([
-            'cook_id' => $cookId,
+            'cook_id' => 2,
             'start_time' => $request->input('start_time'),
             'end_time' => $request->input('end_time'),
             'shift_date' => $request->input('shift_date'),
@@ -112,7 +115,7 @@ class ShiftController extends Controller
             $this->attachPackages($shift, $packages);
             $this->computeEstimateShiftRevenue($shift->id);
 
-            $adminControl = ShiftAdminController::first(); // Ensure this table exists
+            // $adminControl = ShiftAdminController::first(); // Ensure this table exists
             $message = 'Shift created successfully.';
 
             return response()->json([
@@ -318,7 +321,7 @@ class ShiftController extends Controller
      */
     private function getShiftDetails($shiftId)
     {
-        $shift = Shift::with(['meals', 'packages'])->find($shiftId);
+        $shift = Shift::with(['shiftMeals', 'packages'])->find($shiftId);
         if (!$shift) {
             return response()->json(['error' => 'Shift not found'], 404);
         }
@@ -347,6 +350,7 @@ class ShiftController extends Controller
     protected function updateShiftMealIfExistOrAdd($meal, $shiftId)
     {
         $shiftMeal = Shiftmeal::where('shift_id', $shiftId)->first();
+
         if ($shiftMeal) {
             $shiftMeal->update(['quantity' => $meal['quantity']]);
         } else {
