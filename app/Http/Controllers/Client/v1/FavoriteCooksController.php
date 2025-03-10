@@ -11,6 +11,8 @@ class FavoriteCooksController extends Controller
 {
     /**
      * Add a favorite cook.
+     * 
+     * REDUNDANT FAVORITE COOK FUNCTION
      */
     public function store(Request $request)
     {

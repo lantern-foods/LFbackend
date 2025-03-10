@@ -35,13 +35,13 @@ class PaymentController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'MPESA STK Push initiated successfully!',
-            ]);
+            ], 200);
         }
 
         return response()->json([
             'status' => 'error',
             'message' => 'MPESA STK Push failed, please try again!',
-        ], 500);
+        ], 503);
     }
 
     /**

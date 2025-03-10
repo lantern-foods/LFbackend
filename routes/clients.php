@@ -56,7 +56,7 @@ Route::middleware(['auth:api-clients'])->group(function () {
         Route::delete('delete-address/{id}', [ClientaddressController::class, 'deleteAddress']);
         Route::get('clients/payments', [PaymentController::class, 'all_payments']);
         Route::post('rate-order/{orderId}', [OrderRatingController::class, 'rateOrder'])->name('rate.order');
-    Route::get('client-ratings', [OrderRatingController::class, 'showClientRatings'])->name('client.ratings');
+        Route::get('client-ratings', [OrderRatingController::class, 'showClientRatings'])->name('client.ratings');
         Route::post('client/favorite-meals', [FavoriteMealsController::class, 'store']);
         Route::get('client/favorite-meals', [FavoriteMealsController::class, 'index']);
         Route::delete('client/favorite-meals/{id}', [FavoriteMealsController::class, 'destroy']);

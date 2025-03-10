@@ -8,6 +8,7 @@ use App\Jobs\SendClientOtp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Traits\Clients;
+use Illuminate\Support\Facades\Log;
 
 class ClientController extends Controller
 {
@@ -36,6 +37,7 @@ class ClientController extends Controller
 
     /**
      * Store a newly created client in storage.
+     * CHANGE: INCONSISTENT WITH FRONTEND FORM FIELD NAMES
      */
     public function store(Request $request)
     {
