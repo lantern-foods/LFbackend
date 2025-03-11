@@ -160,4 +160,9 @@ return [
 
     'password_timeout' => 10800,
 
+    'passport' => [
+        'public_key'  => base_path('storage/oauth-public.key'),
+        'private_key' => base_path('storage/oauth-private.key'),
+    ],
+
 ];

@@ -46,4 +46,20 @@ class Shift extends Model
     {
         return $this->hasMany(OrderDetail::class);
     }
+
+    /**
+     * Define the relationship between Shift and Meal
+     */
+    public function meals() 
+    { 
+        return $this->belongsToMany(Meal::class, 'shift_meals', 'shift_id', 'meal_id') ->withPivot('quantity'); 
+    }
+
+    /**
+     * Define the relationship between Shift and Package
+     */
+    public function packages() 
+    { 
+        return $this->belongsToMany(Package::class, 'shift_packages', 'shift_id', 'package_id'); 
+    }
 }

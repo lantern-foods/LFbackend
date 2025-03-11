@@ -78,7 +78,7 @@ class ShiftController extends Controller
      */
     public function store(ShiftRequest $request)
     {
-        $request->validated();
+        $validated = $request->validated();
         $cookId = $request->input('cook_id');
         $meals = $request->input('meals', []);
         $packages = $request->input('packages', []);
@@ -90,39 +90,49 @@ class ShiftController extends Controller
             return response()->json(['error' => 'Select at least one meal or package with a target greater than 0.'], 400);
         }
 
-        // Ensure shift does not start before the defined start time
-        $currentTime = Carbon::now();
-        $shiftStatus = $currentTime->lt($startTime) ? 0 : 1; // Scheduled if start time is in the future, otherwise active
+        try {
+            DB::beginTransaction();
+    
+            // Create shift with calculated time status
+            $shift = Shift::create([
+                'cook_id' => $cookId,
+                'start_time' => $validated['start_time'],
+                'end_time' => $validated['end_time'],
+                'shift_date' => $validated['shift_date'],
+                'estimated_revenue' => 0,
+                'shift_status' => Carbon::now()->lt(Carbon::parse($validated['start_time'])) ? 0 : 1,
+            ]);
 
-        // Create shift
-        $shift = Shift::create([
-            'cook_id' => $cookId,
-            'start_time' => $request->input('start_time'),
-            'end_time' => $request->input('end_time'),
-            'shift_date' => $request->input('shift_date'),
-            'estimated_revenue' => 0, // Initial revenue
-            'shift_status' => $shiftStatus, // Scheduled or active
-        ]);
+            if ($shift) {
+                $this->attachMeals($shift, $meals);
+                $this->attachPackages($shift, $packages);
+                
+                // Now update the express_status for each meal that was added to the shift
+                foreach ($meals as $mealData) {
+                    // Assuming $mealData contains a 'meal_id'
+                    Meal::where('id', $mealData['meal_id'])
+                        ->update(['express_status' => 1]);
+                }
+                $this->computeEstimateShiftRevenue($shift->id);
 
-        if ($shift) {
-            $this->attachMeals($shift, $meals);
-            $this->attachPackages($shift, $packages);
-            $this->computeEstimateShiftRevenue($shift->id);
-
+            DB::commit();
             $adminControl = ShiftAdminControll::first(); // Ensure this table exists
-            $message = 'Shift created successfully.';
 
             return response()->json([
                 'status' => 'success',
-                'message' => $message,
-                'data' => $this->getShiftDetails($shift->id),
-            ]);
-        }
+                'message' => 'Shift created successfully.',
+                'data' => $this->getShiftDetails($shift->id)
+            ], 200);
 
-        return response()->json([
-            'status' => 'error',
-            'message' => 'A problem was encountered, shift was NOT created. Please try again!',
-        ]);
+            } 
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Shift creation failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

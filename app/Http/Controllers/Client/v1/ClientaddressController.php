@@ -7,7 +7,7 @@ use App\Models\CustomerAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class ClientaddressController extends Controller
+class ClientAddressController extends Controller
 {
     /**
      * Fetch all addresses for the authenticated client

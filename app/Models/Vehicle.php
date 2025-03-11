@@ -9,6 +9,8 @@ class Vehicle extends Model
 {
     use HasFactory;
 
+    protected $model;
+
     protected $fillable = [
         'deliverycmpy_id',
         'license_plate',

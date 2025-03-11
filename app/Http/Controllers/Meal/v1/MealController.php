@@ -39,7 +39,7 @@ class MealController extends Controller
                 return $meal;
             });
 
-        $packages = Package::with('packageMeals.meal.mealImages') // Corrected relationship name
+        $packages = Package::with('packageMeals.meals.mealImages') // Corrected relationship name
             ->where('express_status', 1)
             ->get()
             ->each(function ($package) {
@@ -61,6 +61,9 @@ class MealController extends Controller
         ]);
     }
 
+
+    
+
     /**
      * Get all meals and packages.
      */
@@ -81,7 +84,7 @@ class MealController extends Controller
                 return $meal;
             });
 
-        $packages = Package::with('packageMeals.meal.mealImages')->get(); // Corrected relationship name
+        $packages = Package::with('packageMeals.meals.mealImages')->get(); // Corrected relationship name
 
         if (!$meals->isEmpty() || !$packages->isEmpty()) {
             return response()->json([
@@ -197,13 +200,13 @@ class MealController extends Controller
                 'status' => 'success',
                 'message' => 'Meal created successfully. Proceed to upload required images.',
                 'meal_id' => $meal->id,
-            ]);
+            ], 200);
         }
 
         return response()->json([
             'status' => 'error',
             'message' => 'An error occurred. Meal was NOT created. Please try again!',
-        ]);
+        ], 400);
     }
 
     /**
@@ -253,7 +256,7 @@ class MealController extends Controller
     private function processImageUpload($image)
     {
         // Get the original extension of the uploaded file
-        $extension = $image->getClientOriginalExtension();
+        $extension = strtolower($image->getClientOriginalExtension());
 
         // Supported image types except GIF
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'bmp', 'webp'];
@@ -267,7 +270,17 @@ class MealController extends Controller
         $uniqueFileName = time() . '_' . Str::random(10) . '.' . $extension;
         $filePath = 'meals/' . $uniqueFileName;
 
-        return $this->uploadToS3($filePath, file_get_contents($image)) ? $this->getImageS3Url($filePath) : false;
+        // Store the file using the "public" disk (local storage)
+        $stored = $image->storeAs('meals', $uniqueFileName, 'public');
+
+        // If storing was successful, get the URL of the stored file
+        if ($stored) {
+            return Storage::disk('public')->url($stored);
+        }
+
+        return false;
+
+        //return $this->uploadToS3($filePath, file_get_contents($image)) ? $this->getImageS3Url($filePath) : false;
     }
 
     private function uploadToS3($filePath, $imageData)

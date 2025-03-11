@@ -7,7 +7,9 @@ use App\Http\Requests\UpdateVehicleRequest;
 use App\Http\Requests\VehicleRequest;
 use App\Models\Vehicle;
 use App\Traits\Vehicles;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 
 class VehicleController extends Controller
 {
@@ -99,6 +101,7 @@ class VehicleController extends Controller
      */
     public function update(UpdateVehicleRequest $request, string $id)
     {
+   
         $request->validated();
 
         $licensePlate = $request->input('license_plate');
